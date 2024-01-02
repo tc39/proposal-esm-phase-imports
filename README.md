@@ -1,77 +1,87 @@
-# Module Instance Imports
+# Static Module Source & Instance
 
 ## Status
 
-Champion(s): Luca Casonato
+Champion(s): Luca Casonato, Guy Bedford
 
 Stage: 0
 
 ## Motivation
 
-Multiple JavaScript modules together form a module graph. This module graph is a
-graph of how all modules are related to each other. At runtime, this graph is
-built to determine which modules are required to be loaded, and in what order.
+### Static Module Analysis
 
-Outside of runtime, other tools, such as bundlers, dependency managers, and
-other static analysis tools such as type checkers, also need to build this
-graph. Because these tools do not execute the code, they need to build the graph
+Multiple JavaScript modules together form a module graph, which encodes the
+execution behaviour of an application. At runtime, this graph is traversed to
+determine which modules are required to be loaded, and in what order.
+
+Outside of the runtime, other tools, such as bundlers, dependency managers, and
+static analysis tools like type checkers, operate on this same execution graph.
+Because these tools do not execute the code, they need to build the graph
 entirely based of static analysis of the code.
 
 In many cases, static analysis of ESM works well, because the majority of
-relations between modules are expressed through "static imports", which use
-statically analyzable string literals to refer to other modules. However, other
-ways that modules can be related to each other are not well statically
+relations between modules are expressed through _static imports_, which use
+statically analyzable string literals to refer to other modules. However, there
+are various classes of other module relations that are not fully statically
 analyzable.
 
-Dynamic imports are one example of this. Dynamic imports are in principle not
-analyzable without execution, because the module specifier passed into them may
-be computed at runtime. However, in practice, many tools can statically analyze
-many dynamic imports, because the module specifier is often a string literal
-expression placed directly into the `import()` call. Sometimes however, the
-module specifier is static (a non computed string literal), but assigned to a
-binding before being passed into `import()`. In this case some tools can analyze
-the dynamic import, but others can not.
+One example of this is dynamic imports, since the module specifier passed into
+them may be computed at runtime. In practice, however, tools can often infer
+many cases of dynamic import - for example a direct string literal can always be
+analyzed:
 
 ```js
-// Impossible static analysis - runtime computed module specifier
-const moduleSpecifier = `./my_module_${Math.random()}.js`;
-import(moduleSpecifier);
-
 // Trivial static analysis
 import("./my_module.js");
-
-// Difficult static analysis - only some tools support this
-const moduleSpecifier = "./my_module.js";
-import(moduleSpecifier);
 ```
 
-These cases are all still approachable for static analysis, because `import()`
-is not a function call, but a syntactic construct. This means that you can not
-do `const import = myImportFunction;` or `const myImport = import;` to alias the
-`import()` function.
+More advanced analysis tools can enlist partial evaluation to determine
+conditional loading edges and their predicates / substituions, although this is
+usually out of scope for most tooling:
 
-`new Worker()` is a case where the relation between two modules is so dynamic
-that static analysis becomes very difficult and often un-reliable. `new Worker`
-is an instance creation where the module specifier is passed in as an argument:
+```js
+// Determinable partial evaluation examples
+const moduleSpecifier = "./my_module.js";
+import(moduleSpecifier);
 
-- The module specifier can be passed in both as a string literal, or via a
-  binding like shown above for dynamic imports.
-- `Worker` is a global variable, so a different binding can be set to the value
-  of `Worker`. For example, `const Worker2 = Worker;`.
-- `Worker` is a constructor, so it can be subclassed, and the subclass can be
-  used to create a worker. For example, `class MyWorker extends Worker {}`.
+const aOrB = unknownCondition ? "a": "b";
+import(`./${aOrB}.js`);
 
-Additionally, because because `Worker` does not use dynamic scoping, you can not
-directly pass a relative module specifier into a worker. Instead, to load a
-module relative to the current module, you need to use `import.meta.url` /
-`import.meta.resolve` to resolve the module specifier to an absolute URL before
-passing it into the worker.
+// Indeterminate example
+import(unknownOutput());
+```
+
+The ability to extend analysis to quite complex partial evaluationc cases is
+made possible by the fact that we can always locate the _sink_ call of the
+dynamic import expression, since `import()` is a syntactical construct and not
+an arbitrary function binding.
+
+### The Worker Static Module Analysis Problem
+
+`new Worker()` is a case where the relation between two modules suffers from a
+number of analysis issues:
+
+1. It always takes an arbitrary expression to locate the worker URL, like
+   dynamic `import()` does. We thus never have fully static worker includes like
+   we do for normal ESM imports and workers therefore always fall under some
+   kind of advanced expression analysis / partial evaluation case in tooling.
+2. The string passed to `new Worker(url)` doesn't support module resolution
+   rules - relative URLs are not resolved module-relative but baseURL-relative,
+   which will be different at runtime versus build / analysis time. For this
+   reason it is often impossible to locate workers without an out-of-band
+   baseURL-based rooting configuration for the analysis system and for the
+   runtime system. The best pattern here is to first resolve URLs using
+   `import.meta.resolve()` or `import.meta.url`, but there are many different
+   patterns here and no single standard approache employed by developers.
+3. `Worker` is a global variable, unlike dynamic `import()`, so that we can't
+   even rely on that binding as a reliable sink for worker URL invocation
+   expression analysis.
 
 This results in a situation where it is very difficult to statically analyze
-which modules are related to each other via `new Worker()`. This is a problem
-for bundlers especially, because they need to know which modules are being
-imported, so they can bundle them into the output, or emit new entrypoints for
-entrypoint modules (as is the case with workers).
+which modules are loaded in workers, and this is a major problem for bundlers
+especially, because they need to know which modules are being imported, so they
+can bundle them into the output, or emit new entrypoints for entrypoint modules
+(as is the case with workers).
 
 ```js
 // Common case, but requires very non-trivial static analysis
@@ -90,22 +100,249 @@ const url = new URL("./my_worker.js", import.meta.url);
 const processor = createWorker(url);
 ```
 
-The language is lacking a primitive to deal with this.
+A better language primitive for worker loading can resolve all three of these
+static analysis gaps improving the situation for analysis, build and runtime
+tooling.
 
-## Use cases
+## Proposal
 
-The lack of more static analysis friendly primitives for determining relation
-between modules is a problem for various forms of bundlers, dependency managers,
-and other static analysis tools. Here are some "in-the-wild" examples of this
-problem:
+This proposal builds on top of the phases primitives introduces by the [Source
+Phase Imports][] proposal, introducing two new primitives for importing a handle
+to a ECMAScript module - the `source` phase and the `module` phase.
+
+### Module Instance
+
+Module instances return a singular stateful object from the module registry that
+captures the module source, resolution and evaluation context for an import, but
+which is initially unlinked and unevaluated (unless that module had already been
+imported previously, in which case it may be in a futher loading state).
+
+Instances import modules at the _module context attach_ phase of the module
+loading process, provides a new phase before the _evaluation_ phase (the normal
+static import phase), effectively exposed from the internal record already used
+to track module loading.
+
+A module instance can at anytime be driven to be fully linked and evaluated in
+the current realm by passing them to dynamic `import()`:
+
+```js
+// enables a form of static preloading for dynamic import
+import module heavyModule from "./heavy-module.js";
+
+function heavyModule() {
+  await import(heavyModule);
+}
+```
+
+Extending `new Worker` to support taking a module instance, we can support
+static module workers:
+
+```js
+import module workerMod from "./my-worker.js";
+// { type: "module" } is inferred since module instances are always modules
+const worker = new Worker(workerMod);
+```
+
+This solves analysis problems (1) and (2) for worker imports in supporting
+static worker references, that resolve through the normal module resolution
+rules in being module-relative and supporting all resolution features.
+
+The object representing the module instance is an opaque object called the
+`Module` object. It is a constructor-less object that can only be obtained
+through the `import module` / `import.module` syntax. It only has one property:
+
+- `get Module.prototype.source()` - Obtain the module source code as a
+  `ModuleSource` object.
+
+The `Module` object is not supported by structured clone - instead it can only
+be used to create a top-level module worker. This module worker has its baseURL
+set to the URL of the instance and also shares its resolution context with the
+parent, for example sharing its host-specific resolution state such as the
+import map.
+
+### Module Source
+
+Module sources are stateless representations of the source of a module. They
+also contain an implicit reference to the original URL of the module, as
+host-specific metadata, to support security and capability-based checking.
+
+_Module sources_ then support transfer into workers, for supporting loading
+modules statically into existing workers:
+
+```js
+import source depSource from 'dep';
+worker.postMessage(depSource);
+```
+
+For now, module sources only support canonical instancing. That is, in a given
+environment, every module source has a _canonical instance_, since all module
+sources are created statically they always have a corresponding instance in this
+way.
+
+When loading the _canonical instance_ of a module source in a different context,
+it is keyed by the double key of both the original key of the module source's
+canonical instance in the original context, and also the key of the context
+reference itself. This way all sources have a unique representation in every
+context, even if they happen to share the same URL.
+
+When passed to dynamic `import()` we obtain the canonical instance for a given
+module source:
+
+app.js
+```js
+// create a new worker, then pass a module into it
+import workerMod from './worker.js';
+import source depSource from 'dep';
+const worker = new Worker(workerMod);
+worker.postMessage(depSource);
+```
+
+worker.js
+```js
+addEventListener('message', evt => {
+  const depSource = evt.data;
+  // dynamically import a new instance from the passed source
+  const dep = import(depSource);
+});
+```
+
+The `ModuleSource` prototype has the following helper methods to allow for
+access to the static analysis on module graphs:
+
+* `get ModuleSource.prototype.staticImports()`, returning a list of objects of
+the form `StaticImport[]`, where `StaticImport` is defined as the object `{
+specifier: string, phase: string, attributes?: [string, primitive][] }`, the
+analysis of an import.
+* `get ModuleSource.prototype.staticExports()`, returning a list of objects of
+the type `DirectExport | ReExport | StarReExport`, with the type of
+`DirectExport`, `{ type: 'direct', name: string }`, the type of `ReExport`, `{
+type: 're-export', name: string, imported: string, import: StaticImport }`, and
+the type of `StarReExport`, `{ type: 'star-re-export', import: StaticImport }`.
+
+In this way it can also be used as an analysis-building helper in other tools
+for simple analysis cases.
+
+### Dynamic Phase Imports
+
+Since phases also support a dynamic import form, we also get the dynamic
+variants of these phases:
+
+```
+const workerModule = await import.module('./worker.js');
+const depSource = await import.source('./dep.js');
+```
+
+with these dynamic forms solving analysis problem (3) as stated in the
+motivation.
+
+## Interactions
+
+### Import attributes
+
+The import attributes proposal provides a way to pass attributes to the module
+loader. Just like with "source" phase imports, this proposal composes with the
+import attributes proposal, allowing attributes to be passed on module instance
+imports.
+
+The attributes are used during source loading and resolution, like specified for
+"source" phase imports. The module source and module instance has already gone
+through this process, so it is already "attributes-influenced". This means that
+when you pass a module instance or module source to a dynamic `import()` or `new
+Worker`, you can not pass additional `with` attributes, and setting attributes
+in `import()` would throw an error.
+
+### Source phase imports
+
+This proposal is designed to work in conjunction with "source" phase imports.
+Imports at the source phase are designed to be used for importing stateless
+module source objects, that can then be multiply instantiated into stateful
+module instances. While neither the source phase imports proposal, nor this
+proposal propose the multiple instantiation of module instances, this is a
+direction we are exploring in the loaders proposal. You can find more concrete
+examples in the loaders section below.
+
+This proposal does allow for synchronous access to a source by using the
+`source` property on the module instance object.
+
+It is also possible to pass a module instance to `import.source` instead of a
+module specifier.
+
+### Module expressions & declarations
+
+The module instance object returned from module instance imports is the same
+module instance object created by module expressions. Both proposals provide
+means to get a module instance object, but they do so in different ways:
+
+- Module expressions and create a module instance object from source text in the
+  current module.
+- Module instance imports create a module instance object from source text in a
+  different module, referenced by a module specifier.
+
+The ways this object is used is identical between the two proposals. In both
+cases, the module instance object is passed to APIs that accept module
+specifiers currently, such as `import()` or `new Worker()`.
+
+The module declaration proposal also provides a parallel binding namespace for
+statically determinable module instance objects to be used in `import from`
+static syntax. Module instances imported statically via module instance imports
+would also be present in this namespace, so could also be imported from
+statically using the `import from` syntax.
+
+Since module expressions and module declarations are statically rooted in the global
+registry (not GC'd), they would also be able to be passed to `new Worker()`.
+
+### Loaders
+
+The loaders proposal provides a way to dynamically create module instances from
+module source objects, optionally providing a custom loader and `import.meta`.
+The module instances created by loaders are the same `Module` object created by
+module instance imports.
+
+These types of instances would be unrooted to the static graph and therefore GC'd
+and existing as dynamically created instances that might bind to arbitrary imports.
+As a result since these instances are unrooted in the global module registry, and
+thus have no concept of identity or keying across contexts, they would not be
+transferrable into workers and throw an error in this case.
+
+The loaders proposal extends the module instance object provided by this
+proposal with a constructor that takes a module source. This allows for dynamic
+creation of module instances.
+
+This constructor unlocks multiple instantiation of a module instance, by calling
+the constructor multiple times with the same module source. This is useful to
+create isolated module instances, for example to use in testing.
+
+The module instances created by loaders are not linked or evaluated immediately,
+just like module instance imports. They can be linked and evaluated later by
+passing them to `import()`, just like module instance imports.
+
+### Deferred imports
+
+The deferred imports proposal provides a way to defer the synchronous evaluation
+of a module until it is needed, but not to defer the linking of the module. This
+is a phase between the "module context attach" phase and the "evaluation" phase.
+
+This differs from this proposal, because this proposal does not perform eager
+linkage. This is important to support passing module instances to other contexts
+such as Web Workers without the linkage being performed in the current context.
+
+This proposal does not interact with the deferred imports proposal, except
+through the addition of support for module instances in the `await
+import.defer()` syntax.
+
+## Use Cases
+
+Supporting new static analysis-friendly primitives for managing more complex
+module loading scenarios extends static analysis tools to new uses, including
+the following "in the wild" examples:
 
 ### Worker bundling in `esbuild`
 
-`esbuild` does not have smart enough analysis to pick up on
-`new Worker(new URL("./my_worker.js", import.meta.url), ...)` style worker
-usage, so it is not able to automatically bundle workers. Instead, it requires
-you to manually specify the worker as a separate entrypoint in your project, and
-then manually configure your `new Worker` call to load this entrypoint.
+`esbuild` does not have smart enough analysis to pick up on `new Worker(new
+URL("./my_worker.js", import.meta.url), ...)` style worker usage, so it is not
+able to automatically bundle workers. Instead, it requires you to manually
+specify the worker as a separate entrypoint in your project, and then manually
+configure your `new Worker` call to load this entrypoint.
 
 This has various drawbacks:
 
@@ -224,153 +461,12 @@ only execute code that was audited by the main thread. It get's access to this
 evaluation capability by being passed a module instance, so the module instance
 is a capability object.
 
-Together with the
-[loaders proposal](https://github.com/tc39/proposal-compartments) this proposal
-can provide novel sandboxing techniques using workers.
-
-## Proposed solution
-
-This proposal introduces a new import syntax, which allows importing modules at
-the "module context attach" phase of the module loading process, instead of at
-"evaluation" phase (which is the phase that static imports are imported at), or
-["source" phase](https://github.com/tc39/proposal-source-phase-imports).
-
-Imports at this phase return a module instance. A module instance is an
-structure that combines a module source with resolution and evaluation context.
-A module instance is initially unlinked and unevaluated. A module instance can
-later be linked and evaluated. Current "evaluation" phase imports also make use
-of this module instance internally, with the difference that modules imported to
-"evaluation" phase are always linked and evaluated (as opposed to this proposal
-where they are not yet linked and evaluated).
-
-In JavaScript, module instances are represented as objects. These objects can be
-passed to APIs that accept module specifiers, such as `import()` or
-`new Worker()`. `import()` directly links and evaluates the module instance
-passed to it, returning the module namespace. `new Worker()` would structurally
-clone the module instance, and then link and evaluate the cloned module instance
-in the worker.
-
-```js
-import module heavyModule from "./heavy_module.js";
-
-function heavyModule() {
-  await import(heavyModule);
-}
-```
-
-```js
-import module workerMod from "./my_worker.js";
-
-const worker = new Worker(workerMod, { type: "module" });
-```
-
-There is also a dynamic import form of this syntax:
-
-```js
-const workerMod = await import.module("./my_worker.js");
-
-const worker = new Worker(workerMod, { type: "module" });
-```
-
-The object representing the module instance is an opaque object called the
-`Module` object. It is a constructor-less object that can only be obtained
-through the `import module` / `import.module` syntax. It only has one property:
-
-- `module.source` - The module source code as a `%AbtractModuleSource%` object.
-
-The `Module` object is structured cloneable and serializable, meaning it can be
-passed to other contexts, such as Web Workers, and then linked and evaluated in
-that context. Identity does not round-trip through structured clone to support
-GC-ability of module instances. Linkage and evaluation of a module instance is
-not preserved when cloning. The resolver does not transfer with the module
-instance - the resolver of the context the module instance is cloned into is
-always used.
-
-## Interactions
-
-### Import attributes
-
-The import attributes proposal provides a way to pass attributes to the module
-loader. Just like with "source" phase imports, this proposal composes with the
-import attributes proposal, allowing attributes to be passed on module instance
-imports.
-
-The attributes are used during source loading and resolution, like specified for
-"source" phase imports. The module instance has already gone through this
-process, so it is already "attributes-influenced". This means that when you pass
-a module instance to a dynamic import or `new Worker`, you can not pass
-additional `with` attributes.
-
-### Source phase imports
-
-This proposal is designed to work in conjunction with "source" phase imports.
-Imports at the source phase are designed to be used for importing stateless
-module source objects, that can then be multiply instantiated into stateful
-module instances. While neither the source phase imports proposal, nor this
-proposal propose the multiple instantiation of module instances, this is a
-direction we are exploring in the loaders proposal. You can find more concrete
-examples in the loaders section below.
-
-This proposal does allow for synchronous access to a source by using the
-`source` property on the module instance object.
-
-It is also possible to pass a module instance to `import.source` instead of a
-module specifier.
-
-### Module expressions & declarations
-
-The module instance object returned from module instance imports is the same
-module instance object created by module expressions. Both proposals provide
-means to get a module instance object, but they do so in different ways:
-
-- Module expressions and create a module instance object from source text in the
-  current module.
-- Module instance imports create a module instance object from source text in a
-  different module, referenced by a module specifier.
-
-The ways this object is used is identical between the two proposals. In both
-cases, the module instance object is passed to APIs that accept module
-specifiers currently, such as `import()` or `new Worker()`.
-
-The module declaration proposal also provides a parallel binding namespace for
-statically determinable module instance objects to be used in `import from`
-static syntax. Module instances imported statically via module instance imports
-would also be present in this namespace, so could also be imported from
-statically using the `import from` syntax.
-
-### Loaders
-
-The loaders proposal provides a way to dynamically create module instances from
-module source objects, optionally providing a custom loader and `import.meta`.
-The module instances created by loaders are the same `Module` object created by
-module instance imports.
-
-The loaders proposal extends the module instance object provided by this
-proposal with a constructor that takes a module source. This allows for dynamic
-creation of module instances.
-
-This constructor unlocks multiple instantiation of a module instance, by calling
-the constructor multiple times with the same module source. This is useful to
-create isolated module instances, for example to use in testing.
-
-The module instances created by loaders are not linked or evaluated immediately,
-just like module instance imports. They can be linked and evaluated later by
-passing them to `import()`, just like module instance imports.
-
-### Deferred imports
-
-The deferred imports proposal provides a way to defer the synchronous evaluation
-of a module until it is needed, but not to defer the linking of the module. This
-is a phase between the "module context attach" phase and the "evaluation" phase.
-
-This differs from this proposal, because this proposal does not perform eager
-linkage. This is important to support passing module instances to other contexts
-such as Web Workers without the linkage being performed in the current context.
-
-This proposal does not interact with the deferred imports proposal, except
-through the addition of support for module instances in the
-`await import.defer()` syntax.
+Together with the [loaders
+proposal](https://github.com/tc39/proposal-compartments) this proposal can
+provide novel sandboxing techniques using workers.
 
 ## Q&A
 
-_Nothing yet!_
+_Post an [issue](https://github.com/lucacasonato/proposal-module-instance-imports/issues)_
+
+[Source Phase Imports]: https://github.com/tc39/proposal-source-phase-imports
