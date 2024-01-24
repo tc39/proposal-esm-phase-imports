@@ -1,4 +1,4 @@
-# Phase Imports for SourceTextModule
+# Source Text Phase Imports
 
 ## Status
 
@@ -9,7 +9,7 @@ Stage: 0
 ## Problem Statement
 
 This proposal seeks to solve the _static worker_ module analysis problem for
-JavaScript, through defining a suitable phase import for SourceTextModule.
+JavaScript, through defining suitable phase imports for Source Text Module.
 
 ## Motivation
 
