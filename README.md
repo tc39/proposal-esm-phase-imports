@@ -28,8 +28,6 @@ workflows suffers from a number of analysis issues:
    `import.meta.url`. There are many different patterns here and no single
    standard approache employed by developers, further exacerbating any analysis
    attempts as per problem (1).
-3. `Worker` is a global variable, unlike dynamic `import()`, further
-   complicating any type of static preloading systems or tooling-based analysis.
 
 Usage examples:
 
@@ -54,17 +52,14 @@ The result is a situation in which is is difficult to reliably statically
 analyze which modules are loaded in workers, causing issues for runtimes and
 tools:
 
-* Runtimes are cannot easily speculatively preload or optimize worker loading
-  prior to the immediate execution of `new Worker()`, resulting in the waterfall
-  for a module worker happening very late, with non-ideal performance
-  characteristics.
+* `new Worker` is not ergonomic for developers to use when authoring
+  applications and especially when authoring libraries.
 * Tools have difficulty both analyzing and bundling applications that use
   workers, resulting in less usage and limited compatibility for shared
   libraries to support workers.
 
-A better language primitive for worker loading can resolve all three of these
-static analysis gaps improving the situation for analysis, build and runtime
-tooling.
+A better language primitive for worker loading can resolve these static analysis
+improving theses workflows as well as their analysis and build tooling.
 
 ## Proposal
 
@@ -72,30 +67,25 @@ By defining a new phase for ECMAScript module records, it is possible to
 import a handle to a module statically, and pass this handle to the worker:
 
 ```js
-// enables a form of static preloading for dynamic import
 import somephase myModule from "./my-module.js";
 
 // `{ type: 'module' }` can be inferred since myModule is a module object
 const worker = new Worker(myModule);
 ```
 
-This technique would solve analysis problems (1) and (2) for worker imports in
-supporting static worker references, while resolving as module-relative via the
-normal module resolution rules with all resolution features supported.
+This technique solves analysis problems (1) and (2) for worker imports in
+improving the runtime worker ergonomics - supporting static worker references,
+while resolving as module-relative via the normal module resolution rules with
+all resolution features supported.
 
-Because the phase import is static and separate to the worker invocation it also
-does not have analysis problem (3), therefore:
+In addition, the improved static analysis makes it possible for tools to analyze
+the worker creation much more easily, to determine that a static `myModule`
+handle is being passed directly to `new Worker`. Bundling can be performed by
+replacing the `./my-module.js` phase import with a phase import to the fully
+optimized worker chunk to load.
 
-* Runtimes can statically determine that a module graph is being loaded (even
-  if it is not yet known it will be loaded in a worker), and trigger
-  ahead-of-time network preloading for the associated module graph and
-  dependencies.
-* Tools can both statically analyze new entry points for workers as well as
-  bundle for workers using this syntax (eg by replacing the `./my-module.js`
-  static phase import with a fully optimized chunk to load).
-
-In addition this new phase would then also layer with the future proposals for
-inline modules and virtualization.
+This new phase would then also lay the ground work for the future proposals for
+module harmony proposals in defining the new phases.
 
 Since phases also support a dynamic import form, we would also get the dynamic
 variant:
