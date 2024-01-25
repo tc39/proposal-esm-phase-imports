@@ -1,4 +1,4 @@
-# Source Text Phase Imports
+# ECMAScript Module Phase Imports
 
 ## Status
 
@@ -67,7 +67,7 @@ By defining a new phase for ECMAScript module records, it is possible to
 import a handle to a module statically, and pass this handle to the worker:
 
 ```js
-import somephase myModule from "./my-module.js";
+import instanceOrSource myModule from "./my-module.js";
 
 // `{ type: 'module' }` can be inferred since myModule is a module object
 const worker = new Worker(myModule);
@@ -91,7 +91,7 @@ Since phases also support a dynamic import form, we would also get the dynamic
 variant:
 
 ```js
-const workerModule = await import.somephase('./worker.js');
+const workerModule = await import.instanceOrSource('./worker.js');
 new Worker(workerModule);
 ```
 
@@ -105,21 +105,22 @@ These phases form the basis of a number of new proposals for modules including
 module declarations, module expressions, deferred module imports, virtualization
 through loaders and new worker semantics.
 
-In order to develop these new proposals in a way that aligns with phased
-imports,Currently this phase is not yet specified for ECMAScript modules
-themselves, as we do not have a definition of this object yet for JavaScript.
+Currently these phases are not yet specified for ECMAScript modules themselves,
+, as we do not have a specifications of any of these objects yet for JavaScript.
 
-One of the driving specification constraints for these objects is also how they
-behave when transferred between agents and workers, which we would argue forms
-a critical design space for these features, which is why this proposal is seen
-as the most suitable "next step" in the larger layering efforts.
+One of the driving specification constraints for these objects is how they
+behave for workers and other agents, which we would argue forms a critical
+design constraint for these features. This is why this proposal's problem
+statement is seen as the most suitable "next step" in the larger module harmony
+layering efforts, with the phase object or objects specified here to support the
+layering of future proposals.
 
 ## Design Questions
 
 ### Module Instance v Module Source
 
-There is an outstanding design question as to whether this phase should be an
-instance or source phase for the module.
+There is the outstanding design question as to whether this phase should be the
+instance phase or the source phase for the module.
 
 The instance phase represents an entire graph of modules, while the source phase
 represents just a specific module source without its linking being defined.
@@ -127,10 +128,10 @@ represents just a specific module source without its linking being defined.
 The benefit of the instance phase being that because it represents the graph, it
 might be more amenable to preloading.
 
-Work to determine which phase to specify is ongoing within this proposal's
-current stage. It may yet specify one or the other, or it may even specify
-_both_ a source and an instance to allow handling some of the deeper tradeoffs
-and layering questions.
+As part of the design progression process, it will be determined that this
+proposal will end up specifying one or the other, or possibly both a source and
+an instance phase for the chosen solution to the use case and layering
+requirements.
 
 ### Transferability
 
