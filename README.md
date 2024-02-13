@@ -4,7 +4,7 @@
 
 Champion(s): Luca Casonato, Guy Bedford
 
-Stage: 0
+Stage: 1
 
 ## Problem Statement
 
@@ -194,6 +194,7 @@ for example.
 
 _Post an [issue](https://github.com/lucacasonato/proposal-module-instance-imports/issues)._
 
+[Compartments Proposal]: https://github.com/tc39/proposal-compartments
 [Deferred Imports]: https://github.com/tc39/proposal-defer-import-eval
 [Loaders Proposal]: [https://github.com/tc39/proposal-compartments/blob/master/0-module-and-module-source.md]
 [Import Attributes Proposal]: https://github.com/tc39/proposal-import-attributes

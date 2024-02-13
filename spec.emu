@@ -5,7 +5,7 @@
 <script src="./spec.js"></script>
 <pre class="metadata">
 title: ECMAScript Module Phase Imports
-stage: 0
+stage: 1
 contributors: Luca Casonato, Guy Bedford
 </pre>
 
