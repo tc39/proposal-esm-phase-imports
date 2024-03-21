@@ -202,6 +202,10 @@ an `AbstractModuleSource` one has already passed the CSP policy checks.
 For JavaScript, CSP integration similarly occurs statically before execution, where having `source`
 phase import handle to a JS `ModuleSource` implies the CSP permission to execute that source.
 
+For `new Worker(module)`, the CSP policy would need to determine the `src` for the module to check
+against. In this case, it should be possible to recreate the original CSP `src` from the
+`[[HostDefined]]` data, without needing any explicit ECMA-262 integration.
+
 ### Structured Clone
 
 A `ModuleSource` instance can be supportable in structured clone, since the underlying
