@@ -120,28 +120,6 @@ The current proposed API is for a `ModuleSource` class instance extending `Abstr
 
 Helper methods are provided to get the direct list of imports and exports of the module.
 
-### `ModuleSource.prototype.exports()`
-
-Returns the list of exports `(DirectExport | Reexport | StarReexport)[]`, defined by:
-
-```ts
-interface DirectExport {
-  type: 'direct',
-  exportName: string,
-}
-
-interface Reexport {
-  type: 'reexport',
-  exportName: string,
-  specifier: string
-}
-
-interface StarReexport {
-  type: 'star-reexport',
-  specifier: string
-}
-```
-
 ### `ModuleSource.prototype.imports()`
 
 Returns the list of imports `Import[]`, defined by:
@@ -149,37 +127,38 @@ Returns the list of imports `Import[]`, defined by:
 ```ts
 interface Import {
   specifier: string,
-  attributes?: [string, string | number | bool][]
+  attributes?: {
+    [key: string]: string
+  }
 }
 ```
 
-### `[[HostDefined]]`
+### `ModuleSource.prototype.exports()`
 
-Identical to the `[[HostDefined]]` field on SourceTextModule records, and defined to uniquely
-identify a module record in the same way in module resolution.
+Returns the list of exports `(Export | StarReexport)[]`, defined by:
+
+```ts
+interface Export {
+  type: 'export',
+  name: string,
+}
+
+interface StarReexport {
+  type: 'star-reexport',
+  from: Import
+}
+```
 
 ### Dynamic Import
 
+On every source, we define a `[[Module]]` internal slot which contains a reference to an
+`AbstractModuleSource` for the source. This represents an unlinked, uninstantiated module instance
+that is uniquely identified for each module source in a given module environment. This allows
+ensuring spec identity between sources and instances in the specification, but implementations
+may choose to optimize out its creation to be lazy or handled in any other way.
+
 When passing any concrete `AbstractModuleSource` instance into a dynamic `import()` expression,
-the following steps should be taken:
-
-1. If an existing module is available matching the same `[[HostDefined]]` data (and import
-  attributes), this module should be used, and driven to execution completion or error.
-1. Otherwise,
-  1. A new module should be created of the appropriate type, with the same `[[HostDefined]]` metadata.
-  1. Dependencies should then be resolved using standard resolution hook `HostResolveImportedModule`.
-
-The result of the above should be that:
-
-* Sources always have a 1-1 unique instance relation in every distinct module loading environment.
-* Specifiers within sources are resolved relative to the original URL or path of that source, through
-the `[[HostDefined]]` metadata being retained when the source is related to its canonical instance.
-
-When custom instancing is supported in future, this will involve short-circuiting the normal
-`HostResolveImportedModule` hook, so there is no conflict with this approach. The only difference
-necessarily would be in the first step to not match "dynamically hooked" modules when performing
-the intial check as to whether the module has been imported previously in the same module loading
-environment.
+the module record at its `[[Module]]` internal slot is imported.
 
 ### Worker Invocation
 
@@ -187,9 +166,9 @@ The expectation for the HTML integration is that `new Worker(module)` or any con
 `AbstractModuleSource` would behave as if the module was first transferred into the worker and then
 imported with dynamic `import()`.
 
-An additional expectation here is also that the worker inherits the default resolution rules of the
-parent environment that the module source was created from to ensure that module resolution behaviour
-remains the same as in the parent context.
+An additional expectation here is also that the created worker inherits the full resolution rules of
+the parent environment that the module source was created from to ensure that module resolution
+behaviour remains the same as in the parent context.
 
 ## Integration with Other Specifications
 
@@ -202,9 +181,13 @@ an `AbstractModuleSource` one has already passed the CSP policy checks.
 For JavaScript, CSP integration similarly occurs statically before execution, where having `source`
 phase import handle to a JS `ModuleSource` implies the CSP permission to execute that source.
 
-For `new Worker(module)`, the CSP policy would need to determine the `src` for the module to check
-against. In this case, it should be possible to recreate the original CSP `src` from the
-`[[HostDefined]]` data, without needing any explicit ECMA-262 integration.
+For dynamic import, passing an `AbstractModuleSource` to dynamic import would not need to go through
+CSP checks, since the obtained object would have already been vetted by CSP.
+
+For `new Worker(module)`, the CSP policy would need to be applied against the `src` for the module
+to verify that there is no policy violation between the separate CSP contexts. In this case, it
+should be possible to recreate the original CSP `src` from the `[[HostDefined]]` data, without
+needing any explicit ECMA-262 integration.
 
 ### Structured Clone
 
