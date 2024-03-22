@@ -184,10 +184,10 @@ phase import handle to a JS `ModuleSource` implies the CSP permission to execute
 For dynamic import, passing an `AbstractModuleSource` to dynamic import would not need to go through
 CSP checks, since the obtained object would have already been vetted by CSP.
 
-For `new Worker(module)`, the CSP policy would need to be applied against the `src` for the module
-to verify that there is no policy violation between the separate CSP contexts. In this case, it
-should be possible to recreate the original CSP `src` from the `[[HostDefined]]` data, without
-needing any explicit ECMA-262 integration.
+For `new Worker(module)`, there may be a stricter `worker-src` policy than the `script-src` policy,
+requiring CSP policy verification against the `src` for the module. In this case, it should be
+possible to recreate the original CSP `src` from the `[[HostDefined]]` data, without needing any
+explicit ECMA-262 integration.
 
 ### Structured Clone
 
