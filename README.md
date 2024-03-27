@@ -67,7 +67,7 @@ By defining a new phase for ECMAScript module records, it is possible to
 import a handle to a module statically, and pass this handle to the worker:
 
 ```js
-import instanceOrSource myModule from "./my-module.js";
+import source myModule from "./my-module.js";
 
 // `{ type: 'module' }` can be inferred since myModule is a module object
 const worker = new Worker(myModule);
@@ -91,7 +91,7 @@ Since phases also support a dynamic import form, we would also get the dynamic
 variant:
 
 ```js
-const workerModule = await import.instanceOrSource('./worker.js');
+const workerModule = await import.source('./worker.js');
 new Worker(workerModule);
 ```
 
@@ -105,8 +105,7 @@ These phases form the basis of a number of new proposals for modules including
 module declarations, module expressions, deferred module imports, virtualization
 through loaders and new worker semantics.
 
-Currently these phases are not yet specified for ECMAScript modules themselves,
-, as we do not have a specifications of any of these objects yet for JavaScript.
+Currently these phases are not yet specified for ECMAScript modules themselves.
 
 One of the driving specification constraints for these objects is how they
 behave for workers and other agents, which we would argue forms a critical
@@ -115,34 +114,98 @@ statement is seen as the most suitable "next step" in the larger module harmony
 layering efforts, with the phase object or objects specified here to support the
 layering of future proposals.
 
-## Design Questions
+## Design
 
-### Module Instance v Module Source
+The current proposed API is for a `ModuleSource` class instance extending `AbstractModuleSource`.
 
-There is the outstanding design question as to whether this phase should be the
-instance phase or the source phase for the module.
+Helper methods are provided to get the direct list of imports and exports of the module.
 
-The instance phase represents an entire graph of modules, while the source phase
-represents just a specific module source without its linking being defined.
+These helper methods are designed to allow for determining the static public exports and public
+imports of a module, but do not give information about the internal module identifiers or dynamic
+import.
 
-The benefit of the instance phase being that because it represents the graph, it
-might be more amenable to preloading.
+### `ModuleSource.prototype.imports()`
 
-As part of the design progression process, it will be determined that this
-proposal will end up specifying one or the other, or possibly both a source and
-an instance phase for the chosen solution to the use case and layering
-requirements.
+Returns the ordered list of the dependencies `Import[]`, defined by:
 
-### Transferability
+```ts
+interface Import {
+  specifier: string,
+  attributes: null | {
+    [key: string]: string
+  },
+  phase: null | 'source'
+}
+```
 
-The phase defined for ECMAScript modules may or may not be a transferable phase,
-via `postMessage` into the worker. The transerability question is also separate
-to the question of supporting `new Worker(phase)` invocation, which can be
-supported for a given phase as separate to the concept of transder.
+Note that all `export` statements with a `from` clause are reflected as imports as well as
+being reflected on exports.
 
-The source phase is currently transferable, while the instance phase may have
-more difficulties in transferability due to having to handle edge cases around
-module identity for dependency transfer.
+### `ModuleSource.prototype.exports()`
+
+Returns the list of public exports `(Export | StarReexport)[]`, defined by:
+
+```ts
+interface Export {
+  type: 'export',
+  name: string,
+}
+
+interface StarReexport {
+  type: 'star-reexport',
+  from: Import
+}
+```
+
+`Export` is provided for both re-exports and local exports. For example,
+`export * as X from './x.js'` would be reflected as the export `{ type: 'export', name: 'x' }`,
+and then also appear in the `Import` dependency list separately.
+
+### Dynamic Import
+
+On every source, we define a `[[Module]]` internal slot which contains a reference to an
+`Source Text Module Record` for the source. This represents an unlinked, uninstantiated module
+instance that is uniquely identified for each module source in a given module environment. This
+allows ensuring spec identity between sources and instances in the specification, but
+implementations may choose to optimize out its creation to be lazy or handled in any other way.
+
+When passing any concrete `AbstractModuleSource` instance into a dynamic `import()` expression,
+the module record at its `[[Module]]` internal slot is imported.
+
+### Worker Invocation
+
+The expectation for the HTML integration is that `new Worker(module)` or any concrete instance of
+`AbstractModuleSource` would behave as if the module was first transferred into the worker and then
+imported with dynamic `import()`.
+
+An additional expectation here is also that the created worker inherits the full resolution rules of
+the parent environment that the module source was created from to ensure that module resolution
+behaviour remains the same as in the parent context.
+
+## Integration with Other Specifications
+
+### CSP Integration
+
+For WebAssembly, CSP integration is a compile-time check, which occurs before construction of
+the `AbstractModuleSource` corresponding to the WebAssembly module. That is, by the time one has
+an `AbstractModuleSource` one has already passed the CSP policy checks.
+
+For JavaScript, CSP integration similarly occurs statically before execution, where having `source`
+phase import handle to a JS `ModuleSource` implies the CSP permission to execute that source.
+
+For dynamic import, passing an `AbstractModuleSource` to dynamic import would not need to go through
+CSP checks, since the obtained object would have already been vetted by CSP.
+
+For `new Worker(module)`, there may be a stricter `worker-src` policy than the `script-src` policy,
+requiring CSP policy verification against the `src` for the module. In this case, it should be
+possible to recreate the original CSP `src` from the `[[HostDefined]]` data, without needing any
+explicit ECMA-262 integration.
+
+### Structured Clone
+
+A `ModuleSource` instance can be supportable in structured clone, since the underlying
+source data has no realm-dependence. Any data stored in `[[HostDefined]]` would need to be
+defined to itself be structured cloneable to be able to be recreated.
 
 ## Layering
 
@@ -155,13 +218,12 @@ whether or not it directly specifies a source phase for ECMAScript modules.
 
 The [Import Attributes Proposal][] provides a way to pass attributes to the
 module loader. These attributes are used during source loading and resolution.
-Because th module source and module instance have already gone through this
-process, they are already _attributes-influenced_ by the time their handle is
-obtained.
+Because the module source has already gone through this process, they are
+already _attributes-influenced_ by the time their handle is obtained.
 
-When passing an module instance or module source object to a dynamic `import()`
-or `new Worker`, any additional `with` attributes would therefore be unsupported
-- and setting attributes would throw an error.
+When passing a module module source object to a dynamic `import()` or `new Worker`,
+any additional `with` attributes would therefore be unsupported - and setting attributes
+would throw an error.
 
 ### Deferred imports
 
@@ -184,15 +246,14 @@ phase object foundations are specified in this proposal.
 The [Compartments Proposal][] provides a way to dynamically create module
 instances from module source objects, optionally providing custom loaders.
 
-The module source and module instance definitions are being aligned with the
-definitions in use within this proposal and others. Where they are specified
-in this proposal or others, the compartment loaders proposal may extend their
-functionality further in future by adding new methods to these existing objects
-for example.
+The module source definition here is being aligned with the definitions in use
+within this proposal and others. Where they are specified in this proposal or others,
+the compartment loaders proposal may extend their functionality further in future by
+adding new methods to these existing objects for example.
 
 ## Q&A
 
-_Post an [issue](https://github.com/lucacasonato/proposal-module-instance-imports/issues)._
+_Post an [issue](https://github.com/tc39/proposal-esm-phase-imports/issues)._
 
 [Compartments Proposal]: https://github.com/tc39/proposal-compartments
 [Deferred Imports]: https://github.com/tc39/proposal-defer-import-eval
