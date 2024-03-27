@@ -117,18 +117,18 @@ layering of future proposals.
 
 The current proposed API is for a `ModuleSource` class instance extending `AbstractModuleSource`.
 
-Helper methods are provided to get the direct list of imports and exports of the module.
+Helper methods are provided to get the direct list of dependencies and exports of the module.
 
 These helper methods are designed to allow for determining the static public exports and public
 imports of a module, but do not give information about the internal module identifiers or dynamic
 import.
 
-### `ModuleSource.prototype.imports()`
+### `ModuleSource.prototype.dependencies()`
 
-Returns the ordered list of the dependencies `Import[]`, defined by:
+Returns the ordered list of the dependencies `Dependency[]`, defined by:
 
 ```ts
-interface Import {
+interface Dependency {
   specifier: string,
   attributes: null | {
     [key: string]: string
@@ -137,8 +137,7 @@ interface Import {
 }
 ```
 
-Note that all `export` statements with a `from` clause are reflected as imports as well as
-being reflected on exports.
+This list includes all `import` statements as well as all `export` statements with a `from` clause.
 
 ### `ModuleSource.prototype.exports()`
 
@@ -152,13 +151,13 @@ interface Export {
 
 interface StarReexport {
   type: 'star-reexport',
-  from: Import
+  from: Dependency
 }
 ```
 
 `Export` is provided for both re-exports and local exports. For example,
 `export * as X from './x.js'` would be reflected as the export `{ type: 'export', name: 'x' }`,
-and then also appear in the `Import` dependency list separately.
+and then also appear in the `Dependency` dependency list separately.
 
 ### Dynamic Import
 
