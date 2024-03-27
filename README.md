@@ -40,7 +40,7 @@ const url = import.meta.resolve("./my_worker.js");
 const worker = new Worker(url, { type: "module" });
 
 // This can quickly turn into near impossible static analysis for most tools
-function createWorker(specifier) {
+function createWorker(url) {
   return new Worker(url, { type: "module" });
 }
 
@@ -58,8 +58,8 @@ tools:
   workers, resulting in less usage and limited compatibility for shared
   libraries to support workers.
 
-A better language primitive for worker loading can resolve these static analysis
-improving theses workflows as well as their analysis and build tooling.
+A better language primitive for worker loading can improve worker ergonomics
+for users as well as their support in analysis and build tooling.
 
 ## Proposal
 
@@ -78,17 +78,16 @@ improving the runtime worker ergonomics - supporting static worker references,
 while resolving as module-relative via the normal module resolution rules with
 all resolution features supported.
 
-In addition, the improved static analysis makes it possible for tools to analyze
-the worker creation much more easily, to determine that a static `myModule`
-handle is being passed directly to `new Worker`. Bundling can be performed by
-replacing the `./my-module.js` phase import with a phase import to the fully
-optimized worker chunk to load.
+The improved static analysis makes it possible for tools to analyze the worker
+references more easily, to determine that a static `myModule` handle is being
+passed directly to `new Worker`. Bundling can be performed by replacing the
+`./my-module.js` phase import with a phase import to the fully optimized worker
+chunk to load.
 
-This new phase would then also lay the ground work for the future proposals for
-module harmony proposals in defining the new phases.
+Defining this phase would then also lay the ground work for the future module
+harmony proposals that require a source representation.
 
-Since phases also support a dynamic import form, we would also get the dynamic
-variant:
+Since phases also support a dynamic import form, we also define the dynamic variant:
 
 ```js
 const workerModule = await import.source('./worker.js');
