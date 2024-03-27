@@ -120,22 +120,30 @@ The current proposed API is for a `ModuleSource` class instance extending `Abstr
 
 Helper methods are provided to get the direct list of imports and exports of the module.
 
+These helper methods are designed to allow for determining the static public exports and public
+imports of a module, but do not give information about the internal module identifiers or dynamic
+import.
+
 ### `ModuleSource.prototype.imports()`
 
-Returns the list of imports `Import[]`, defined by:
+Returns the ordered list of the dependencies `Import[]`, defined by:
 
 ```ts
 interface Import {
   specifier: string,
-  attributes?: {
+  attributes: null | {
     [key: string]: string
-  }
+  },
+  phase: null | 'source'
 }
 ```
 
+Note that all `export` statements with a `from` clause are reflected as imports as well as
+being reflected on exports.
+
 ### `ModuleSource.prototype.exports()`
 
-Returns the list of exports `(Export | StarReexport)[]`, defined by:
+Returns the list of public exports `(Export | StarReexport)[]`, defined by:
 
 ```ts
 interface Export {
@@ -149,13 +157,17 @@ interface StarReexport {
 }
 ```
 
+`Export` is provided for both re-exports and local exports. For example,
+`export * as X from './x.js'` would be reflected as the export `{ type: 'export', name: 'x' }`,
+and then also appear in the `Import` dependency list separately.
+
 ### Dynamic Import
 
 On every source, we define a `[[Module]]` internal slot which contains a reference to an
-`AbstractModuleSource` for the source. This represents an unlinked, uninstantiated module instance
-that is uniquely identified for each module source in a given module environment. This allows
-ensuring spec identity between sources and instances in the specification, but implementations
-may choose to optimize out its creation to be lazy or handled in any other way.
+`Source Text Module Record` for the source. This represents an unlinked, uninstantiated module
+instance that is uniquely identified for each module source in a given module environment. This
+allows ensuring spec identity between sources and instances in the specification, but
+implementations may choose to optimize out its creation to be lazy or handled in any other way.
 
 When passing any concrete `AbstractModuleSource` instance into a dynamic `import()` expression,
 the module record at its `[[Module]]` internal slot is imported.
