@@ -1,0 +1,4127 @@
+<!doctype html>
+<head><meta charset="utf-8">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.0.1/styles/base16/solarized-light.min.css"><link rel="stylesheet" href="./spec.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/8.4/styles/github.min.css">
+<script src="./spec.js"></script>
+<title>ECMAScript Module Phase Imports</title><script>'use strict';
+let sdoBox = {
+  init() {
+    this.$alternativeId = null;
+    this.$outer = document.createElement('div');
+    this.$outer.classList.add('toolbox-container');
+    this.$container = document.createElement('div');
+    this.$container.classList.add('toolbox');
+    this.$displayLink = document.createElement('a');
+    this.$displayLink.setAttribute('href', '#');
+    this.$displayLink.textContent = 'Syntax-Directed Operations';
+    this.$displayLink.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      referencePane.showSDOs(sdoMap[this.$alternativeId] || {}, this.$alternativeId);
+    });
+    this.$container.appendChild(this.$displayLink);
+    this.$outer.appendChild(this.$container);
+    document.body.appendChild(this.$outer);
+  },
+
+  activate(el) {
+    clearTimeout(this.deactiveTimeout);
+    Toolbox.deactivate();
+    this.$alternativeId = el.id;
+    let numSdos = Object.keys(sdoMap[this.$alternativeId] || {}).length;
+    this.$displayLink.textContent = 'Syntax-Directed Operations (' + numSdos + ')';
+    this.$outer.classList.add('active');
+    let top = el.offsetTop - this.$outer.offsetHeight;
+    let left = el.offsetLeft + 50 - 10; // 50px = padding-left(=75px) + text-indent(=-25px)
+    this.$outer.setAttribute('style', 'left: ' + left + 'px; top: ' + top + 'px');
+    if (top < document.body.scrollTop) {
+      this.$container.scrollIntoView();
+    }
+  },
+
+  deactivate() {
+    clearTimeout(this.deactiveTimeout);
+    this.$outer.classList.remove('active');
+  },
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof sdoMap == 'undefined') {
+    console.error('could not find sdo map');
+    return;
+  }
+  sdoBox.init();
+
+  let insideTooltip = false;
+  sdoBox.$outer.addEventListener('pointerenter', () => {
+    insideTooltip = true;
+  });
+  sdoBox.$outer.addEventListener('pointerleave', () => {
+    insideTooltip = false;
+    sdoBox.deactivate();
+  });
+
+  sdoBox.deactiveTimeout = null;
+  [].forEach.call(document.querySelectorAll('emu-grammar[type=definition] emu-rhs'), node => {
+    node.addEventListener('pointerenter', function () {
+      sdoBox.activate(this);
+    });
+
+    node.addEventListener('pointerleave', () => {
+      sdoBox.deactiveTimeout = setTimeout(() => {
+        if (!insideTooltip) {
+          sdoBox.deactivate();
+        }
+      }, 500);
+    });
+  });
+
+  document.addEventListener(
+    'keydown',
+    debounce(e => {
+      if (e.code === 'Escape') {
+        sdoBox.deactivate();
+      }
+    })
+  );
+});
+
+'use strict';
+function Search(menu) {
+  this.menu = menu;
+  this.$search = document.getElementById('menu-search');
+  this.$searchBox = document.getElementById('menu-search-box');
+  this.$searchResults = document.getElementById('menu-search-results');
+
+  this.loadBiblio();
+
+  document.addEventListener('keydown', this.documentKeydown.bind(this));
+
+  this.$searchBox.addEventListener(
+    'keydown',
+    debounce(this.searchBoxKeydown.bind(this), { stopPropagation: true })
+  );
+  this.$searchBox.addEventListener(
+    'keyup',
+    debounce(this.searchBoxKeyup.bind(this), { stopPropagation: true })
+  );
+
+  // Perform an initial search if the box is not empty.
+  if (this.$searchBox.value) {
+    this.search(this.$searchBox.value);
+  }
+}
+
+Search.prototype.loadBiblio = function () {
+  if (typeof biblio === 'undefined') {
+    console.error('could not find biblio');
+    this.biblio = { refToClause: {}, entries: [] };
+  } else {
+    this.biblio = biblio;
+    this.biblio.clauses = this.biblio.entries.filter(e => e.type === 'clause');
+    this.biblio.byId = this.biblio.entries.reduce((map, entry) => {
+      map[entry.id] = entry;
+      return map;
+    }, {});
+    let refParentClause = Object.create(null);
+    this.biblio.refParentClause = refParentClause;
+    let refsByClause = this.biblio.refsByClause;
+    Object.keys(refsByClause).forEach(clause => {
+      refsByClause[clause].forEach(ref => {
+        refParentClause[ref] = clause;
+      });
+    });
+  }
+};
+
+Search.prototype.documentKeydown = function (e) {
+  if (e.key === '/') {
+    e.preventDefault();
+    e.stopPropagation();
+    this.triggerSearch();
+  }
+};
+
+Search.prototype.searchBoxKeydown = function (e) {
+  e.stopPropagation();
+  e.preventDefault();
+  if (e.keyCode === 191 && e.target.value.length === 0) {
+    e.preventDefault();
+  } else if (e.keyCode === 13) {
+    e.preventDefault();
+    this.selectResult();
+  }
+};
+
+Search.prototype.searchBoxKeyup = function (e) {
+  if (e.keyCode === 13 || e.keyCode === 9) {
+    return;
+  }
+
+  this.search(e.target.value);
+};
+
+Search.prototype.triggerSearch = function () {
+  if (this.menu.isVisible()) {
+    this._closeAfterSearch = false;
+  } else {
+    this._closeAfterSearch = true;
+    this.menu.show();
+  }
+
+  this.$searchBox.focus();
+  this.$searchBox.select();
+};
+// bit 12 - Set if the result starts with searchString
+// bits 8-11: 8 - number of chunks multiplied by 2 if cases match, otherwise 1.
+// bits 1-7: 127 - length of the entry
+// General scheme: prefer case sensitive matches with fewer chunks, and otherwise
+// prefer shorter matches.
+function relevance(result) {
+  let relevance = 0;
+
+  relevance = Math.max(0, 8 - result.match.chunks) << 7;
+
+  if (result.match.caseMatch) {
+    relevance *= 2;
+  }
+
+  if (result.match.prefix) {
+    relevance += 2048;
+  }
+
+  relevance += Math.max(0, 255 - result.key.length);
+
+  return relevance;
+}
+
+Search.prototype.search = function (searchString) {
+  if (searchString === '') {
+    this.displayResults([]);
+    this.hideSearch();
+    return;
+  } else {
+    this.showSearch();
+  }
+
+  if (searchString.length === 1) {
+    this.displayResults([]);
+    return;
+  }
+
+  let results;
+
+  if (/^[\d.]*$/.test(searchString)) {
+    results = this.biblio.clauses
+      .filter(clause => clause.number.substring(0, searchString.length) === searchString)
+      .map(clause => ({ key: getKey(clause), entry: clause }));
+  } else {
+    results = [];
+
+    for (let i = 0; i < this.biblio.entries.length; i++) {
+      let entry = this.biblio.entries[i];
+      let key = getKey(entry);
+      if (!key) {
+        // biblio entries without a key aren't searchable
+        continue;
+      }
+
+      let match = fuzzysearch(searchString, key);
+      if (match) {
+        results.push({ key, entry, match });
+      }
+    }
+
+    results.forEach(result => {
+      result.relevance = relevance(result, searchString);
+    });
+
+    results = results.sort((a, b) => b.relevance - a.relevance);
+  }
+
+  if (results.length > 50) {
+    results = results.slice(0, 50);
+  }
+
+  this.displayResults(results);
+};
+Search.prototype.hideSearch = function () {
+  this.$search.classList.remove('active');
+};
+
+Search.prototype.showSearch = function () {
+  this.$search.classList.add('active');
+};
+
+Search.prototype.selectResult = function () {
+  let $first = this.$searchResults.querySelector('li:first-child a');
+
+  if ($first) {
+    document.location = $first.getAttribute('href');
+  }
+
+  this.$searchBox.value = '';
+  this.$searchBox.blur();
+  this.displayResults([]);
+  this.hideSearch();
+
+  if (this._closeAfterSearch) {
+    this.menu.hide();
+  }
+};
+
+Search.prototype.displayResults = function (results) {
+  if (results.length > 0) {
+    this.$searchResults.classList.remove('no-results');
+
+    let html = '<ul>';
+
+    results.forEach(result => {
+      let key = result.key;
+      let entry = result.entry;
+      let id = entry.id;
+      let cssClass = '';
+      let text = '';
+
+      if (entry.type === 'clause') {
+        let number = entry.number ? entry.number + ' ' : '';
+        text = number + key;
+        cssClass = 'clause';
+        id = entry.id;
+      } else if (entry.type === 'production') {
+        text = key;
+        cssClass = 'prod';
+        id = entry.id;
+      } else if (entry.type === 'op') {
+        text = key;
+        cssClass = 'op';
+        id = entry.id || entry.refId;
+      } else if (entry.type === 'term') {
+        text = key;
+        cssClass = 'term';
+        id = entry.id || entry.refId;
+      }
+
+      if (text) {
+        // prettier-ignore
+        html += `<li class=menu-search-result-${cssClass}><a href="${makeLinkToId(id)}">${text}</a></li>`;
+      }
+    });
+
+    html += '</ul>';
+
+    this.$searchResults.innerHTML = html;
+  } else {
+    this.$searchResults.innerHTML = '';
+    this.$searchResults.classList.add('no-results');
+  }
+};
+
+function getKey(item) {
+  if (item.key) {
+    return item.key;
+  }
+  switch (item.type) {
+    case 'clause':
+      return item.title || item.titleHTML;
+    case 'production':
+      return item.name;
+    case 'op':
+      return item.aoid;
+    case 'term':
+      return item.term;
+    case 'table':
+    case 'figure':
+    case 'example':
+    case 'note':
+      return item.caption;
+    case 'step':
+      return item.id;
+    default:
+      throw new Error("Can't get key for " + item.type);
+  }
+}
+
+function Menu() {
+  this.$toggle = document.getElementById('menu-toggle');
+  this.$menu = document.getElementById('menu');
+  this.$toc = document.querySelector('menu-toc > ol');
+  this.$pins = document.querySelector('#menu-pins');
+  this.$pinList = document.getElementById('menu-pins-list');
+  this.$toc = document.querySelector('#menu-toc > ol');
+  this.$specContainer = document.getElementById('spec-container');
+  this.search = new Search(this);
+
+  this._pinnedIds = {};
+  this.loadPinEntries();
+
+  // toggle menu
+  this.$toggle.addEventListener('click', this.toggle.bind(this));
+
+  // keydown events for pinned clauses
+  document.addEventListener('keydown', this.documentKeydown.bind(this));
+
+  // toc expansion
+  let tocItems = this.$menu.querySelectorAll('#menu-toc li');
+  for (let i = 0; i < tocItems.length; i++) {
+    let $item = tocItems[i];
+    $item.addEventListener('click', event => {
+      $item.classList.toggle('active');
+      event.stopPropagation();
+    });
+  }
+
+  // close toc on toc item selection
+  let tocLinks = this.$menu.querySelectorAll('#menu-toc li > a');
+  for (let i = 0; i < tocLinks.length; i++) {
+    let $link = tocLinks[i];
+    $link.addEventListener('click', event => {
+      this.toggle();
+      event.stopPropagation();
+    });
+  }
+
+  // update active clause on scroll
+  window.addEventListener('scroll', debounce(this.updateActiveClause.bind(this)));
+  this.updateActiveClause();
+
+  // prevent menu scrolling from scrolling the body
+  this.$toc.addEventListener('wheel', e => {
+    let target = e.currentTarget;
+    let offTop = e.deltaY < 0 && target.scrollTop === 0;
+    if (offTop) {
+      e.preventDefault();
+    }
+    let offBottom = e.deltaY > 0 && target.offsetHeight + target.scrollTop >= target.scrollHeight;
+
+    if (offBottom) {
+      e.preventDefault();
+    }
+  });
+}
+
+Menu.prototype.documentKeydown = function (e) {
+  e.stopPropagation();
+  if (e.keyCode === 80) {
+    this.togglePinEntry();
+  } else if (e.keyCode > 48 && e.keyCode < 58) {
+    this.selectPin(e.keyCode - 49);
+  }
+};
+
+Menu.prototype.updateActiveClause = function () {
+  this.setActiveClause(findActiveClause(this.$specContainer));
+};
+
+Menu.prototype.setActiveClause = function (clause) {
+  this.$activeClause = clause;
+  this.revealInToc(this.$activeClause);
+};
+
+Menu.prototype.revealInToc = function (path) {
+  let current = this.$toc.querySelectorAll('li.revealed');
+  for (let i = 0; i < current.length; i++) {
+    current[i].classList.remove('revealed');
+    current[i].classList.remove('revealed-leaf');
+  }
+
+  current = this.$toc;
+  let index = 0;
+  outer: while (index < path.length) {
+    let children = current.children;
+    for (let i = 0; i < children.length; i++) {
+      if ('#' + path[index].id === children[i].children[1].hash) {
+        children[i].classList.add('revealed');
+        if (index === path.length - 1) {
+          children[i].classList.add('revealed-leaf');
+          let rect = children[i].getBoundingClientRect();
+          // this.$toc.getBoundingClientRect().top;
+          let tocRect = this.$toc.getBoundingClientRect();
+          if (rect.top + 10 > tocRect.bottom) {
+            this.$toc.scrollTop =
+              this.$toc.scrollTop + (rect.top - tocRect.bottom) + (rect.bottom - rect.top);
+          } else if (rect.top < tocRect.top) {
+            this.$toc.scrollTop = this.$toc.scrollTop - (tocRect.top - rect.top);
+          }
+        }
+        current = children[i].querySelector('ol');
+        index++;
+        continue outer;
+      }
+    }
+    console.log('could not find location in table of contents', path);
+    break;
+  }
+};
+
+function findActiveClause(root, path) {
+  path = path || [];
+
+  let visibleClauses = getVisibleClauses(root, path);
+  let midpoint = Math.floor(window.innerHeight / 2);
+
+  for (let [$clause, path] of visibleClauses) {
+    let { top: clauseTop, bottom: clauseBottom } = $clause.getBoundingClientRect();
+    let isFullyVisibleAboveTheFold =
+      clauseTop > 0 && clauseTop < midpoint && clauseBottom < window.innerHeight;
+    if (isFullyVisibleAboveTheFold) {
+      return path;
+    }
+  }
+
+  visibleClauses.sort(([, pathA], [, pathB]) => pathB.length - pathA.length);
+  for (let [$clause, path] of visibleClauses) {
+    let { top: clauseTop, bottom: clauseBottom } = $clause.getBoundingClientRect();
+    let $header = $clause.querySelector('h1');
+    let clauseStyles = getComputedStyle($clause);
+    let marginTop = Math.max(
+      0,
+      parseInt(clauseStyles['margin-top']),
+      parseInt(getComputedStyle($header)['margin-top'])
+    );
+    let marginBottom = Math.max(0, parseInt(clauseStyles['margin-bottom']));
+    let crossesMidpoint =
+      clauseTop - marginTop <= midpoint && clauseBottom + marginBottom >= midpoint;
+    if (crossesMidpoint) {
+      return path;
+    }
+  }
+
+  return path;
+}
+
+function getVisibleClauses(root, path) {
+  let childClauses = getChildClauses(root);
+  path = path || [];
+
+  let result = [];
+
+  let seenVisibleClause = false;
+  for (let $clause of childClauses) {
+    let { top: clauseTop, bottom: clauseBottom } = $clause.getBoundingClientRect();
+    let isPartiallyVisible =
+      (clauseTop > 0 && clauseTop < window.innerHeight) ||
+      (clauseBottom > 0 && clauseBottom < window.innerHeight) ||
+      (clauseTop < 0 && clauseBottom > window.innerHeight);
+
+    if (isPartiallyVisible) {
+      seenVisibleClause = true;
+      let innerPath = path.concat($clause);
+      result.push([$clause, innerPath]);
+      result.push(...getVisibleClauses($clause, innerPath));
+    } else if (seenVisibleClause) {
+      break;
+    }
+  }
+
+  return result;
+}
+
+function* getChildClauses(root) {
+  for (let el of root.children) {
+    switch (el.nodeName) {
+      // descend into <emu-import>
+      case 'EMU-IMPORT':
+        yield* getChildClauses(el);
+        break;
+
+      // accept <emu-clause>, <emu-intro>, and <emu-annex>
+      case 'EMU-CLAUSE':
+      case 'EMU-INTRO':
+      case 'EMU-ANNEX':
+        yield el;
+    }
+  }
+}
+
+Menu.prototype.toggle = function () {
+  this.$menu.classList.toggle('active');
+};
+
+Menu.prototype.show = function () {
+  this.$menu.classList.add('active');
+};
+
+Menu.prototype.hide = function () {
+  this.$menu.classList.remove('active');
+};
+
+Menu.prototype.isVisible = function () {
+  return this.$menu.classList.contains('active');
+};
+
+Menu.prototype.showPins = function () {
+  this.$pins.classList.add('active');
+};
+
+Menu.prototype.hidePins = function () {
+  this.$pins.classList.remove('active');
+};
+
+Menu.prototype.addPinEntry = function (id) {
+  let entry = this.search.biblio.byId[id];
+  if (!entry) {
+    // id was deleted after pin (or something) so remove it
+    delete this._pinnedIds[id];
+    this.persistPinEntries();
+    return;
+  }
+
+  if (entry.type === 'clause') {
+    let prefix;
+    if (entry.number) {
+      prefix = entry.number + ' ';
+    } else {
+      prefix = '';
+    }
+    // prettier-ignore
+    this.$pinList.innerHTML += `<li><a href="${makeLinkToId(entry.id)}">${prefix}${entry.titleHTML}</a></li>`;
+  } else {
+    this.$pinList.innerHTML += `<li><a href="${makeLinkToId(entry.id)}">${getKey(entry)}</a></li>`;
+  }
+
+  if (Object.keys(this._pinnedIds).length === 0) {
+    this.showPins();
+  }
+  this._pinnedIds[id] = true;
+  this.persistPinEntries();
+};
+
+Menu.prototype.removePinEntry = function (id) {
+  let item = this.$pinList.querySelector(`a[href="${makeLinkToId(id)}"]`).parentNode;
+  this.$pinList.removeChild(item);
+  delete this._pinnedIds[id];
+  if (Object.keys(this._pinnedIds).length === 0) {
+    this.hidePins();
+  }
+
+  this.persistPinEntries();
+};
+
+Menu.prototype.persistPinEntries = function () {
+  try {
+    if (!window.localStorage) return;
+  } catch (e) {
+    return;
+  }
+
+  localStorage.pinEntries = JSON.stringify(Object.keys(this._pinnedIds));
+};
+
+Menu.prototype.loadPinEntries = function () {
+  try {
+    if (!window.localStorage) return;
+  } catch (e) {
+    return;
+  }
+
+  let pinsString = window.localStorage.pinEntries;
+  if (!pinsString) return;
+  let pins = JSON.parse(pinsString);
+  for (let i = 0; i < pins.length; i++) {
+    this.addPinEntry(pins[i]);
+  }
+};
+
+Menu.prototype.togglePinEntry = function (id) {
+  if (!id) {
+    id = this.$activeClause[this.$activeClause.length - 1].id;
+  }
+
+  if (this._pinnedIds[id]) {
+    this.removePinEntry(id);
+  } else {
+    this.addPinEntry(id);
+  }
+};
+
+Menu.prototype.selectPin = function (num) {
+  document.location = this.$pinList.children[num].children[0].href;
+};
+
+let menu;
+
+document.addEventListener('DOMContentLoaded', init);
+
+function debounce(fn, opts) {
+  opts = opts || {};
+  let timeout;
+  return function (e) {
+    if (opts.stopPropagation) {
+      e.stopPropagation();
+    }
+    let args = arguments;
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(() => {
+      timeout = null;
+      fn.apply(this, args);
+    }, 150);
+  };
+}
+
+let CLAUSE_NODES = ['EMU-CLAUSE', 'EMU-INTRO', 'EMU-ANNEX'];
+function findContainer($elem) {
+  let parentClause = $elem.parentNode;
+  while (parentClause && CLAUSE_NODES.indexOf(parentClause.nodeName) === -1) {
+    parentClause = parentClause.parentNode;
+  }
+  return parentClause;
+}
+
+function findLocalReferences(parentClause, name) {
+  let vars = parentClause.querySelectorAll('var');
+  let references = [];
+
+  for (let i = 0; i < vars.length; i++) {
+    let $var = vars[i];
+
+    if ($var.innerHTML === name) {
+      references.push($var);
+    }
+  }
+
+  return references;
+}
+
+let REFERENCED_CLASSES = Array.from({ length: 7 }, (x, i) => `referenced${i}`);
+function chooseHighlightIndex(parentClause) {
+  let counts = REFERENCED_CLASSES.map($class => parentClause.getElementsByClassName($class).length);
+  // Find the earliest index with the lowest count.
+  let minCount = Infinity;
+  let index = null;
+  for (let i = 0; i < counts.length; i++) {
+    if (counts[i] < minCount) {
+      minCount = counts[i];
+      index = i;
+    }
+  }
+  return index;
+}
+
+function toggleFindLocalReferences($elem) {
+  let parentClause = findContainer($elem);
+  let references = findLocalReferences(parentClause, $elem.innerHTML);
+  if ($elem.classList.contains('referenced')) {
+    references.forEach($reference => {
+      $reference.classList.remove('referenced', ...REFERENCED_CLASSES);
+    });
+  } else {
+    let index = chooseHighlightIndex(parentClause);
+    references.forEach($reference => {
+      $reference.classList.add('referenced', `referenced${index}`);
+    });
+  }
+}
+
+function installFindLocalReferences() {
+  document.addEventListener('click', e => {
+    if (e.target.nodeName === 'VAR') {
+      toggleFindLocalReferences(e.target);
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', installFindLocalReferences);
+
+// The following license applies to the fuzzysearch function
+// The MIT License (MIT)
+// Copyright © 2015 Nicolas Bevacqua
+// Copyright © 2016 Brian Terlson
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+// the Software, and to permit persons to whom the Software is furnished to do so,
+// subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+// FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+// COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+// IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+// CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+function fuzzysearch(searchString, haystack, caseInsensitive) {
+  let tlen = haystack.length;
+  let qlen = searchString.length;
+  let chunks = 1;
+  let finding = false;
+
+  if (qlen > tlen) {
+    return false;
+  }
+
+  if (qlen === tlen) {
+    if (searchString === haystack) {
+      return { caseMatch: true, chunks: 1, prefix: true };
+    } else if (searchString.toLowerCase() === haystack.toLowerCase()) {
+      return { caseMatch: false, chunks: 1, prefix: true };
+    } else {
+      return false;
+    }
+  }
+
+  let j = 0;
+  outer: for (let i = 0; i < qlen; i++) {
+    let nch = searchString[i];
+    while (j < tlen) {
+      let targetChar = haystack[j++];
+      if (targetChar === nch) {
+        finding = true;
+        continue outer;
+      }
+      if (finding) {
+        chunks++;
+        finding = false;
+      }
+    }
+
+    if (caseInsensitive) {
+      return false;
+    }
+
+    return fuzzysearch(searchString.toLowerCase(), haystack.toLowerCase(), true);
+  }
+
+  return { caseMatch: !caseInsensitive, chunks, prefix: j <= qlen };
+}
+
+let referencePane = {
+  init() {
+    this.$container = document.createElement('div');
+    this.$container.setAttribute('id', 'references-pane-container');
+
+    let $spacer = document.createElement('div');
+    $spacer.setAttribute('id', 'references-pane-spacer');
+    $spacer.classList.add('menu-spacer');
+
+    this.$pane = document.createElement('div');
+    this.$pane.setAttribute('id', 'references-pane');
+
+    this.$container.appendChild($spacer);
+    this.$container.appendChild(this.$pane);
+
+    this.$header = document.createElement('div');
+    this.$header.classList.add('menu-pane-header');
+    this.$headerText = document.createElement('span');
+    this.$header.appendChild(this.$headerText);
+    this.$headerRefId = document.createElement('a');
+    this.$header.appendChild(this.$headerRefId);
+    this.$closeButton = document.createElement('span');
+    this.$closeButton.setAttribute('id', 'references-pane-close');
+    this.$closeButton.addEventListener('click', () => {
+      this.deactivate();
+    });
+    this.$header.appendChild(this.$closeButton);
+
+    this.$pane.appendChild(this.$header);
+    let tableContainer = document.createElement('div');
+    tableContainer.setAttribute('id', 'references-pane-table-container');
+
+    this.$table = document.createElement('table');
+    this.$table.setAttribute('id', 'references-pane-table');
+
+    this.$tableBody = this.$table.createTBody();
+
+    tableContainer.appendChild(this.$table);
+    this.$pane.appendChild(tableContainer);
+
+    menu.$specContainer.appendChild(this.$container);
+  },
+
+  activate() {
+    this.$container.classList.add('active');
+  },
+
+  deactivate() {
+    this.$container.classList.remove('active');
+    this.state = null;
+  },
+
+  showReferencesFor(entry) {
+    this.activate();
+    this.state = { type: 'ref', id: entry.id };
+    this.$headerText.textContent = 'References to ';
+    let newBody = document.createElement('tbody');
+    let previousId;
+    let previousCell;
+    let dupCount = 0;
+    this.$headerRefId.textContent = '#' + entry.id;
+    this.$headerRefId.setAttribute('href', makeLinkToId(entry.id));
+    this.$headerRefId.style.display = 'inline';
+    (entry.referencingIds || [])
+      .map(id => {
+        let cid = menu.search.biblio.refParentClause[id];
+        let clause = menu.search.biblio.byId[cid];
+        if (clause == null) {
+          throw new Error('could not find clause for id ' + cid);
+        }
+        return { id, clause };
+      })
+      .sort((a, b) => sortByClauseNumber(a.clause, b.clause))
+      .forEach(record => {
+        if (previousId === record.clause.id) {
+          previousCell.innerHTML += ` (<a href="${makeLinkToId(record.id)}">${dupCount + 2}</a>)`;
+          dupCount++;
+        } else {
+          let row = newBody.insertRow();
+          let cell = row.insertCell();
+          cell.innerHTML = record.clause.number;
+          cell = row.insertCell();
+          cell.innerHTML = `<a href="${makeLinkToId(record.id)}">${record.clause.titleHTML}</a>`;
+          previousCell = cell;
+          previousId = record.clause.id;
+          dupCount = 0;
+        }
+      }, this);
+    this.$table.removeChild(this.$tableBody);
+    this.$tableBody = newBody;
+    this.$table.appendChild(this.$tableBody);
+  },
+
+  showSDOs(sdos, alternativeId) {
+    let rhs = document.getElementById(alternativeId);
+    let parentName = rhs.parentNode.getAttribute('name');
+    let colons = rhs.parentNode.querySelector('emu-geq');
+    rhs = rhs.cloneNode(true);
+    rhs.querySelectorAll('emu-params,emu-constraints').forEach(e => {
+      e.remove();
+    });
+    rhs.querySelectorAll('[id]').forEach(e => {
+      e.removeAttribute('id');
+    });
+    rhs.querySelectorAll('a').forEach(e => {
+      e.parentNode.replaceChild(document.createTextNode(e.textContent), e);
+    });
+
+    // prettier-ignore
+    this.$headerText.innerHTML = `Syntax-Directed Operations for<br><a href="${makeLinkToId(alternativeId)}" class="menu-pane-header-production"><emu-nt>${parentName}</emu-nt> ${colons.outerHTML} </a>`;
+    this.$headerText.querySelector('a').append(rhs);
+    this.showSDOsBody(sdos, alternativeId);
+  },
+
+  showSDOsBody(sdos, alternativeId) {
+    this.activate();
+    this.state = { type: 'sdo', id: alternativeId, html: this.$headerText.innerHTML };
+    this.$headerRefId.style.display = 'none';
+    let newBody = document.createElement('tbody');
+    Object.keys(sdos).forEach(sdoName => {
+      let pair = sdos[sdoName];
+      let clause = pair.clause;
+      let ids = pair.ids;
+      let first = ids[0];
+      let row = newBody.insertRow();
+      let cell = row.insertCell();
+      cell.innerHTML = clause;
+      cell = row.insertCell();
+      let html = '<a href="' + makeLinkToId(first) + '">' + sdoName + '</a>';
+      for (let i = 1; i < ids.length; ++i) {
+        html += ' (<a href="' + makeLinkToId(ids[i]) + '">' + (i + 1) + '</a>)';
+      }
+      cell.innerHTML = html;
+    });
+    this.$table.removeChild(this.$tableBody);
+    this.$tableBody = newBody;
+    this.$table.appendChild(this.$tableBody);
+  },
+};
+
+let Toolbox = {
+  init() {
+    this.$outer = document.createElement('div');
+    this.$outer.classList.add('toolbox-container');
+    this.$container = document.createElement('div');
+    this.$container.classList.add('toolbox');
+    this.$outer.appendChild(this.$container);
+    this.$permalink = document.createElement('a');
+    this.$permalink.textContent = 'Permalink';
+    this.$pinLink = document.createElement('a');
+    this.$pinLink.textContent = 'Pin';
+    this.$pinLink.setAttribute('href', '#');
+    this.$pinLink.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      menu.togglePinEntry(this.entry.id);
+      this.$pinLink.textContent = menu._pinnedIds[this.entry.id] ? 'Unpin' : 'Pin';
+    });
+
+    this.$refsLink = document.createElement('a');
+    this.$refsLink.setAttribute('href', '#');
+    this.$refsLink.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      referencePane.showReferencesFor(this.entry);
+    });
+    this.$container.appendChild(this.$permalink);
+    this.$container.appendChild(this.$pinLink);
+    this.$container.appendChild(this.$refsLink);
+    document.body.appendChild(this.$outer);
+  },
+
+  activate(el, entry, target) {
+    if (el === this._activeEl) return;
+    sdoBox.deactivate();
+    this.active = true;
+    this.entry = entry;
+    this.$pinLink.textContent = menu._pinnedIds[entry.id] ? 'Unpin' : 'Pin';
+    this.$outer.classList.add('active');
+    this.top = el.offsetTop - this.$outer.offsetHeight;
+    this.left = el.offsetLeft - 10;
+    this.$outer.setAttribute('style', 'left: ' + this.left + 'px; top: ' + this.top + 'px');
+    this.updatePermalink();
+    this.updateReferences();
+    this._activeEl = el;
+    if (this.top < document.body.scrollTop && el === target) {
+      // don't scroll unless it's a small thing (< 200px)
+      this.$outer.scrollIntoView();
+    }
+  },
+
+  updatePermalink() {
+    this.$permalink.setAttribute('href', makeLinkToId(this.entry.id));
+  },
+
+  updateReferences() {
+    this.$refsLink.textContent = `References (${(this.entry.referencingIds || []).length})`;
+  },
+
+  activateIfMouseOver(e) {
+    let ref = this.findReferenceUnder(e.target);
+    if (ref && (!this.active || e.pageY > this._activeEl.offsetTop)) {
+      let entry = menu.search.biblio.byId[ref.id];
+      this.activate(ref.element, entry, e.target);
+    } else if (
+      this.active &&
+      (e.pageY < this.top || e.pageY > this._activeEl.offsetTop + this._activeEl.offsetHeight)
+    ) {
+      this.deactivate();
+    }
+  },
+
+  findReferenceUnder(el) {
+    while (el) {
+      let parent = el.parentNode;
+      if (el.nodeName === 'EMU-RHS' || el.nodeName === 'EMU-PRODUCTION') {
+        return null;
+      }
+      if (
+        el.nodeName === 'H1' &&
+        parent.nodeName.match(/EMU-CLAUSE|EMU-ANNEX|EMU-INTRO/) &&
+        parent.id
+      ) {
+        return { element: el, id: parent.id };
+      } else if (el.nodeName === 'EMU-NT') {
+        if (
+          parent.nodeName === 'EMU-PRODUCTION' &&
+          parent.id &&
+          parent.id[0] !== '_' &&
+          parent.firstElementChild === el
+        ) {
+          // return the LHS non-terminal element
+          return { element: el, id: parent.id };
+        }
+        return null;
+      } else if (
+        el.nodeName.match(/EMU-(?!CLAUSE|XREF|ANNEX|INTRO)|DFN/) &&
+        el.id &&
+        el.id[0] !== '_'
+      ) {
+        if (
+          el.nodeName === 'EMU-FIGURE' ||
+          el.nodeName === 'EMU-TABLE' ||
+          el.nodeName === 'EMU-EXAMPLE'
+        ) {
+          // return the figcaption element
+          return { element: el.children[0].children[0], id: el.id };
+        } else {
+          return { element: el, id: el.id };
+        }
+      }
+      el = parent;
+    }
+  },
+
+  deactivate() {
+    this.$outer.classList.remove('active');
+    this._activeEl = null;
+    this.active = false;
+  },
+};
+
+function sortByClauseNumber(clause1, clause2) {
+  let c1c = clause1.number.split('.');
+  let c2c = clause2.number.split('.');
+
+  for (let i = 0; i < c1c.length; i++) {
+    if (i >= c2c.length) {
+      return 1;
+    }
+
+    let c1 = c1c[i];
+    let c2 = c2c[i];
+    let c1cn = Number(c1);
+    let c2cn = Number(c2);
+
+    if (Number.isNaN(c1cn) && Number.isNaN(c2cn)) {
+      if (c1 > c2) {
+        return 1;
+      } else if (c1 < c2) {
+        return -1;
+      }
+    } else if (!Number.isNaN(c1cn) && Number.isNaN(c2cn)) {
+      return -1;
+    } else if (Number.isNaN(c1cn) && !Number.isNaN(c2cn)) {
+      return 1;
+    } else if (c1cn > c2cn) {
+      return 1;
+    } else if (c1cn < c2cn) {
+      return -1;
+    }
+  }
+
+  if (c1c.length === c2c.length) {
+    return 0;
+  }
+  return -1;
+}
+
+function makeLinkToId(id) {
+  let hash = '#' + id;
+  if (typeof idToSection === 'undefined' || !idToSection[id]) {
+    return hash;
+  }
+  let targetSec = idToSection[id];
+  return (targetSec === 'index' ? './' : targetSec + '.html') + hash;
+}
+
+function doShortcut(e) {
+  if (!(e.target instanceof HTMLElement)) {
+    return;
+  }
+  let target = e.target;
+  let name = target.nodeName.toLowerCase();
+  if (name === 'textarea' || name === 'input' || name === 'select' || target.isContentEditable) {
+    return;
+  }
+  if (e.altKey || e.ctrlKey || e.metaKey) {
+    return;
+  }
+  if (e.key === 'm' && usesMultipage) {
+    let pathParts = location.pathname.split('/');
+    let hash = location.hash;
+    if (pathParts[pathParts.length - 2] === 'multipage') {
+      if (hash === '') {
+        let sectionName = pathParts[pathParts.length - 1];
+        if (sectionName.endsWith('.html')) {
+          sectionName = sectionName.slice(0, -5);
+        }
+        if (idToSection['sec-' + sectionName] !== undefined) {
+          hash = '#sec-' + sectionName;
+        }
+      }
+      location = pathParts.slice(0, -2).join('/') + '/' + hash;
+    } else {
+      location = 'multipage/' + hash;
+    }
+  } else if (e.key === 'u') {
+    document.documentElement.classList.toggle('show-ao-annotations');
+  } else if (e.key === '?') {
+    document.getElementById('shortcuts-help').classList.toggle('active');
+  }
+}
+
+function init() {
+  menu = new Menu();
+  let $container = document.getElementById('spec-container');
+  $container.addEventListener(
+    'mouseover',
+    debounce(e => {
+      Toolbox.activateIfMouseOver(e);
+    })
+  );
+  document.addEventListener(
+    'keydown',
+    debounce(e => {
+      if (e.code === 'Escape') {
+        if (Toolbox.active) {
+          Toolbox.deactivate();
+        }
+        document.getElementById('shortcuts-help').classList.remove('active');
+      }
+    })
+  );
+}
+
+document.addEventListener('keypress', doShortcut);
+
+document.addEventListener('DOMContentLoaded', () => {
+  Toolbox.init();
+  referencePane.init();
+});
+
+// preserve state during navigation
+
+function getTocPath(li) {
+  let path = [];
+  let pointer = li;
+  while (true) {
+    let parent = pointer.parentElement;
+    if (parent == null) {
+      return null;
+    }
+    let index = [].indexOf.call(parent.children, pointer);
+    if (index == -1) {
+      return null;
+    }
+    path.unshift(index);
+    pointer = parent.parentElement;
+    if (pointer == null) {
+      return null;
+    }
+    if (pointer.id === 'menu-toc') {
+      break;
+    }
+    if (pointer.tagName !== 'LI') {
+      return null;
+    }
+  }
+  return path;
+}
+
+function activateTocPath(path) {
+  try {
+    let pointer = document.getElementById('menu-toc');
+    for (let index of path) {
+      pointer = pointer.querySelector('ol').children[index];
+    }
+    pointer.classList.add('active');
+  } catch (e) {
+    // pass
+  }
+}
+
+function getActiveTocPaths() {
+  return [...menu.$menu.querySelectorAll('.active')].map(getTocPath).filter(p => p != null);
+}
+
+function initTOCExpansion(visibleItemLimit) {
+  // Initialize to a reasonable amount of TOC expansion:
+  // * Expand any full-breadth nesting level up to visibleItemLimit.
+  // * Expand any *single-item* level while under visibleItemLimit (even if that pushes over it).
+
+  // Limit to initialization by bailing out if any parent item is already expanded.
+  const tocItems = Array.from(document.querySelectorAll('#menu-toc li'));
+  if (tocItems.some(li => li.classList.contains('active') && li.querySelector('li'))) {
+    return;
+  }
+
+  const selfAndSiblings = maybe => Array.from(maybe?.parentNode.children ?? []);
+  let currentLevelItems = selfAndSiblings(tocItems[0]);
+  let availableCount = visibleItemLimit - currentLevelItems.length;
+  while (availableCount > 0 && currentLevelItems.length) {
+    const nextLevelItems = currentLevelItems.flatMap(li => selfAndSiblings(li.querySelector('li')));
+    availableCount -= nextLevelItems.length;
+    if (availableCount > 0 || currentLevelItems.length === 1) {
+      // Expand parent items of the next level down (i.e., current-level items with children).
+      for (const ol of new Set(nextLevelItems.map(li => li.parentNode))) {
+        ol.closest('li').classList.add('active');
+      }
+    }
+    currentLevelItems = nextLevelItems;
+  }
+}
+
+function initState() {
+  if (typeof menu === 'undefined' || window.navigating) {
+    return;
+  }
+  const storage = typeof sessionStorage !== 'undefined' ? sessionStorage : Object.create(null);
+  if (storage.referencePaneState != null) {
+    let state = JSON.parse(storage.referencePaneState);
+    if (state != null) {
+      if (state.type === 'ref') {
+        let entry = menu.search.biblio.byId[state.id];
+        if (entry != null) {
+          referencePane.showReferencesFor(entry);
+        }
+      } else if (state.type === 'sdo') {
+        let sdos = sdoMap[state.id];
+        if (sdos != null) {
+          referencePane.$headerText.innerHTML = state.html;
+          referencePane.showSDOsBody(sdos, state.id);
+        }
+      }
+      delete storage.referencePaneState;
+    }
+  }
+
+  if (storage.activeTocPaths != null) {
+    document.querySelectorAll('#menu-toc li.active').forEach(li => li.classList.remove('active'));
+    let active = JSON.parse(storage.activeTocPaths);
+    active.forEach(activateTocPath);
+    delete storage.activeTocPaths;
+  } else {
+    initTOCExpansion(20);
+  }
+
+  if (storage.searchValue != null) {
+    let value = JSON.parse(storage.searchValue);
+    menu.search.$searchBox.value = value;
+    menu.search.search(value);
+    delete storage.searchValue;
+  }
+
+  if (storage.tocScroll != null) {
+    let tocScroll = JSON.parse(storage.tocScroll);
+    menu.$toc.scrollTop = tocScroll;
+    delete storage.tocScroll;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', initState);
+
+window.addEventListener('pageshow', initState);
+
+window.addEventListener('beforeunload', () => {
+  if (!window.sessionStorage || typeof menu === 'undefined') {
+    return;
+  }
+  sessionStorage.referencePaneState = JSON.stringify(referencePane.state || null);
+  sessionStorage.activeTocPaths = JSON.stringify(getActiveTocPaths());
+  sessionStorage.searchValue = JSON.stringify(menu.search.$searchBox.value);
+  sessionStorage.tocScroll = JSON.stringify(menu.$toc.scrollTop);
+});
+
+'use strict';
+
+// Manually prefix algorithm step list items with hidden counter representations
+// corresponding with their markers so they get selected and copied with content.
+// We read list-style-type to avoid divergence with the style sheet, but
+// for efficiency assume that all lists at the same nesting depth use the same
+// style (except for those associated with replacement steps).
+// We also precompute some initial items for each supported style type.
+// https://w3c.github.io/csswg-drafts/css-counter-styles/
+
+const lowerLetters = Array.from({ length: 26 }, (_, i) =>
+  String.fromCharCode('a'.charCodeAt(0) + i)
+);
+// Implement the lower-alpha 'alphabetic' algorithm,
+// adjusting for indexing from 0 rather than 1.
+// https://w3c.github.io/csswg-drafts/css-counter-styles/#simple-alphabetic
+// https://w3c.github.io/csswg-drafts/css-counter-styles/#alphabetic-system
+const lowerAlphaTextForIndex = i => {
+  let S = '';
+  for (const N = lowerLetters.length; i >= 0; i--) {
+    S = lowerLetters[i % N] + S;
+    i = Math.floor(i / N);
+  }
+  return S;
+};
+
+const weightedLowerRomanSymbols = Object.entries({
+  m: 1000,
+  cm: 900,
+  d: 500,
+  cd: 400,
+  c: 100,
+  xc: 90,
+  l: 50,
+  xl: 40,
+  x: 10,
+  ix: 9,
+  v: 5,
+  iv: 4,
+  i: 1,
+});
+// Implement the lower-roman 'additive' algorithm,
+// adjusting for indexing from 0 rather than 1.
+// https://w3c.github.io/csswg-drafts/css-counter-styles/#simple-numeric
+// https://w3c.github.io/csswg-drafts/css-counter-styles/#additive-system
+const lowerRomanTextForIndex = i => {
+  let value = i + 1;
+  let S = '';
+  for (const [symbol, weight] of weightedLowerRomanSymbols) {
+    if (!value) break;
+    if (weight > value) continue;
+    const reps = Math.floor(value / weight);
+    S += symbol.repeat(reps);
+    value -= weight * reps;
+  }
+  return S;
+};
+
+// Memoize pure index-to-text functions with an exposed cache for fast retrieval.
+const makeCounter = (pureGetTextForIndex, precomputeCount = 30) => {
+  const cache = Array.from({ length: precomputeCount }, (_, i) => pureGetTextForIndex(i));
+  const getTextForIndex = i => {
+    if (i >= cache.length) cache[i] = pureGetTextForIndex(i);
+    return cache[i];
+  };
+  return { getTextForIndex, cache };
+};
+
+const counterByStyle = {
+  __proto__: null,
+  decimal: makeCounter(i => String(i + 1)),
+  'lower-alpha': makeCounter(lowerAlphaTextForIndex),
+  'upper-alpha': makeCounter(i => lowerAlphaTextForIndex(i).toUpperCase()),
+  'lower-roman': makeCounter(lowerRomanTextForIndex),
+  'upper-roman': makeCounter(i => lowerRomanTextForIndex(i).toUpperCase()),
+};
+const fallbackCounter = makeCounter(() => '?');
+const counterByDepth = [];
+
+function addStepNumberText(
+  ol,
+  depth = 0,
+  special = [...ol.classList].some(c => c.startsWith('nested-'))
+) {
+  let counter = !special && counterByDepth[depth];
+  if (!counter) {
+    const counterStyle = getComputedStyle(ol)['list-style-type'];
+    counter = counterByStyle[counterStyle];
+    if (!counter) {
+      console.warn('unsupported list-style-type', {
+        ol,
+        counterStyle,
+        id: ol.closest('[id]')?.getAttribute('id'),
+      });
+      counterByStyle[counterStyle] = fallbackCounter;
+      counter = fallbackCounter;
+    }
+    if (!special) {
+      counterByDepth[depth] = counter;
+    }
+  }
+  const { cache, getTextForIndex } = counter;
+  let i = (Number(ol.getAttribute('start')) || 1) - 1;
+  for (const li of ol.children) {
+    const marker = document.createElement('span');
+    marker.textContent = `${i < cache.length ? cache[i] : getTextForIndex(i)}. `;
+    marker.setAttribute('aria-hidden', 'true');
+    const attributesContainer = li.querySelector('.attributes-tag');
+    if (attributesContainer == null) {
+      li.prepend(marker);
+    } else {
+      attributesContainer.insertAdjacentElement('afterend', marker);
+    }
+    for (const sublist of li.querySelectorAll(':scope > ol')) {
+      addStepNumberText(sublist, depth + 1, special);
+    }
+    i++;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('emu-alg > ol').forEach(ol => {
+    addStepNumberText(ol);
+  });
+});
+
+let sdoMap = JSON.parse(`{"prod-uZn3IQfi":{"Evaluation":{"clause":"13.3.10.1","ids":["prod-4N8EtSSM"]}},"prod-WqUZkrPx":{"Evaluation":{"clause":"13.3.10.1","ids":["prod-E9lFAjcF"]}}}`);
+let biblio = JSON.parse(`{"refsByClause":{"sec-well-known-intrinsic-objects":["_ref_0","_ref_1","_ref_2"],"sec-ContinueDynamicImport":["_ref_3","_ref_13"],"sec-abstract-module-records":["_ref_4","_ref_5","_ref_6","_ref_14","_ref_15","_ref_16","_ref_17","_ref_18","_ref_19","_ref_20","_ref_21","_ref_22","_ref_23","_ref_24","_ref_25","_ref_26","_ref_27","_ref_28"],"sec-cyclic-module-records":["_ref_7","_ref_8","_ref_29","_ref_30","_ref_31","_ref_32","_ref_33","_ref_34","_ref_35"],"sec-import-call-runtime-semantics-evaluation":["_ref_9","_ref_10"],"sec-evaluate-import-call":["_ref_11","_ref_12"],"sec-modulelistimports":["_ref_36"],"sec-modulelistexports":["_ref_37"],"sec-source-text-module-record-getmodulesource":["_ref_38"],"sec-HostGetModuleSourceName":["_ref_39","_ref_40"],"sec-HostGetModuleSourceRecord":["_ref_41","_ref_42","_ref_43","_ref_44"],"sec-module-source-objects":["_ref_45","_ref_46"],"sec-%abstractmodulesource%.prototype":["_ref_47"],"sec-get-%abstractmodulesource%.prototype.@@tostringtag":["_ref_48","_ref_49","_ref_50","_ref_51"],"sec-%abstractmodulesource%.prototype.imports":["_ref_52","_ref_53"],"sec-%abstractmodulesource%.prototype.exports":["_ref_54","_ref_55"],"sec-properties-of-the-%modulesource%-prototype-object":["_ref_56"],"sec-properties-of-modulesource-instances":["_ref_57"],"sec-getmodulesourcesourcetextmodulerecord":["_ref_58"],"sec-host-hooks-summary":["_ref_59","_ref_60"]},"entries":[{"type":"table","id":"table-well-known-intrinsic-objects","number":1,"caption":"Table 1: Well-Known Intrinsic Objects","referencingIds":["_ref_0"]},{"type":"clause","id":"sec-well-known-intrinsic-objects","titleHTML":"Well-Known Intrinsic Objects","number":"1.1.1.1"},{"type":"clause","id":"sec-object-type","titleHTML":"Object Type","number":"1.1.1","referencingIds":["_ref_48","_ref_49"]},{"type":"clause","id":"sec-ecmascript-language-types","titleHTML":"ECMAScript Language Types","number":"1.1"},{"type":"op","aoid":"Type","refId":"sec-ecmascript-data-types-and-values"},{"type":"clause","id":"sec-ecmascript-data-types-and-values","titleHTML":"ECMAScript Data Types and Values","number":"1"},{"type":"production","id":"prod-ImportCall","name":"ImportCall"},{"type":"clause","id":"sec-import-call-runtime-semantics-evaluation","titleHTML":"Runtime Semantics: Evaluation","number":"13.3.10.1"},{"type":"op","aoid":"EvaluateImportCall","refId":"sec-evaluate-import-call"},{"type":"clause","id":"sec-evaluate-import-call","title":"EvaluateImportCall ( specifierExpression, phase )","titleHTML":"EvaluateImportCall ( <var>specifierExpression</var>, <var>phase</var> )","number":"13.3.10.2","referencingIds":["_ref_9","_ref_10"]},{"type":"clause","id":"sec-import-calls","titleHTML":"Import Calls","number":"13.3.10","referencingIds":["_ref_3"]},{"type":"op","aoid":"ContinueDynamicImport","refId":"sec-ContinueDynamicImport"},{"type":"clause","id":"sec-ContinueDynamicImport","title":"ContinueDynamicImport ( promiseCapability, phase, moduleCompletion )","titleHTML":"ContinueDynamicImport ( <var>promiseCapability</var>, <ins><var>phase</var></ins>, <var>moduleCompletion</var> )","number":"13.3.11","referencingIds":["_ref_12"]},{"type":"clause","id":"sec-left-hand-side-expressions","titleHTML":"Left-Hand-Side Expressions","number":"13.3"},{"type":"clause","id":"sec-ecmascript-language-expressions","titleHTML":"ECMAScript Language: Expressions","number":"13"},{"type":"term","term":"Module Record","refId":"sec-abstract-module-records"},{"type":"table","id":"table-module-record-fields","number":2,"caption":"Table 2: Module Record Fields","referencingIds":["_ref_4","_ref_7"]},{"type":"table","id":"table-abstract-methods-of-module-records","number":3,"caption":"Table 3: Abstract Methods of Module Records","referencingIds":["_ref_5"]},{"type":"term","term":"ResolvedBinding Record","id":"resolvedbinding-record"},{"type":"clause","id":"sec-abstract-module-records","titleHTML":"Abstract Module Records","number":"16.1.1.1","referencingIds":["_ref_13","_ref_15","_ref_16","_ref_17","_ref_19","_ref_20","_ref_22","_ref_23","_ref_24","_ref_25","_ref_26","_ref_27","_ref_28","_ref_30","_ref_41","_ref_42"]},{"type":"term","term":"Cyclic Module Record","id":"cyclic-module-record","referencingIds":["_ref_14","_ref_29","_ref_31","_ref_32","_ref_33","_ref_34","_ref_35","_ref_36","_ref_37","_ref_53","_ref_55"]},{"type":"table","id":"table-cyclic-module-fields","number":4,"caption":"Table 4: Additional Fields of Cyclic Module Records","referencingIds":["_ref_8"]},{"type":"clause","id":"sec-modulelistimports","titleHTML":"ListImports ( )","number":"16.1.1.2.1"},{"type":"clause","id":"sec-modulelistexports","titleHTML":"ListExports ( )","number":"16.1.1.2.2"},{"type":"clause","id":"sec-cyclic-module-records","titleHTML":"Cyclic Module Records","number":"16.1.1.2"},{"type":"clause","id":"sec-source-text-module-record-getmodulesource","titleHTML":"GetModuleSource ( )","number":"16.1.1.3.1"},{"type":"clause","id":"sec-source-text-module-records","titleHTML":"Source Text Module Records","number":"16.1.1.3"},{"type":"op","aoid":"HostGetModuleSourceName","refId":"sec-HostGetModuleSourceName"},{"type":"clause","id":"sec-HostGetModuleSourceName","title":"HostGetModuleSourceName ( moduleSource )","titleHTML":"<del>HostGetModuleSourceName ( <var>moduleSource</var> )</del>","number":"16.1.1.4","referencingIds":["_ref_45","_ref_50","_ref_59"]},{"type":"op","aoid":"HostGetModuleSourceRecord","refId":"sec-HostGetModuleSourceRecord"},{"type":"clause","id":"sec-HostGetModuleSourceRecord","title":"HostGetModuleSourceRecord ( moduleSource )","titleHTML":"<ins>HostGetModuleSourceRecord ( <var>moduleSource</var> )</ins>","number":"16.1.1.5","referencingIds":["_ref_11","_ref_46","_ref_51","_ref_52","_ref_54","_ref_58","_ref_60"]},{"type":"clause","id":"sec-module-semantics","titleHTML":"Module Semantics","number":"16.1.1"},{"type":"clause","id":"sec-modules","titleHTML":"Modules","number":"16.1"},{"type":"clause","id":"sec-ecmascript-language-scripts-and-modules","titleHTML":"ECMAScript Language: Scripts and Modules","number":"16"},{"type":"term","term":"Module Source Object","refId":"sec-module-source-objects"},{"type":"clause","id":"sec-%abstractmodulesource%","titleHTML":"%AbstractModuleSource% ( )","number":"28.1.1.1"},{"type":"clause","id":"sec-%abstractmodulesource%-constructor","titleHTML":"The %AbstractModuleSource% Constructor","number":"28.1.1","referencingIds":["_ref_1"]},{"type":"clause","id":"sec-%abstractmodulesource%.prototype","titleHTML":"%AbstractModuleSource%.prototype","number":"28.1.2.1"},{"type":"clause","id":"sec-properties-of-the-%abstractmodulesource%-intrinsic-object","titleHTML":"Properties of the %AbstractModuleSource% Intrinsic Object","number":"28.1.2"},{"type":"term","term":"%AbstractModuleSource% prototype object","refId":"sec-properties-of-the-%abstractmodulesource%-prototype-object"},{"type":"term","term":"%AbstractModuleSource.prototype%","refId":"sec-properties-of-the-%abstractmodulesource%-prototype-object"},{"type":"clause","id":"sec-%abstractmodulesource%.prototype.constructor","titleHTML":"%AbstractModuleSource%.prototype.constructor","number":"28.1.3.1"},{"type":"clause","id":"sec-get-%abstractmodulesource%.prototype.@@tostringtag","titleHTML":"get %AbstractModuleSource%.prototype [ @@toStringTag ]","number":"28.1.3.2"},{"type":"clause","id":"sec-%abstractmodulesource%.prototype.imports","title":"%AbstractModuleSource%.prototype.imports ( )","titleHTML":"<ins>%AbstractModuleSource%.prototype.imports ( )</ins>","number":"28.1.3.3"},{"type":"clause","id":"sec-%abstractmodulesource%.prototype.exports","title":"%AbstractModuleSource%.prototype.exports ( )","titleHTML":"<ins>%AbstractModuleSource%.prototype.exports ( )</ins>","number":"28.1.3.4"},{"type":"clause","id":"sec-properties-of-the-%abstractmodulesource%-prototype-object","titleHTML":"Properties of the %AbstractModuleSource% Prototype Object","number":"28.1.3","referencingIds":["_ref_21","_ref_47","_ref_56"]},{"type":"clause","id":"sec-%modulesource%","titleHTML":"%ModuleSource% ( )","number":"28.1.4.1"},{"type":"clause","id":"sec-module-source-object","title":"The %ModuleSource% Constructor","titleHTML":"<ins>The %ModuleSource% Constructor</ins>","number":"28.1.4","referencingIds":["_ref_2"]},{"type":"term","term":"%ModuleSource% prototype object","refId":"sec-properties-of-the-%modulesource%-prototype-object"},{"type":"term","term":"%ModuleSource.prototype%","refId":"sec-properties-of-the-%modulesource%-prototype-object"},{"type":"clause","id":"sec-%modulesource%.prototype.constructor","title":"%ModuleSource%.prototype.constructor","titleHTML":"<ins>%ModuleSource%.prototype.constructor</ins>","number":"28.1.5.1"},{"type":"clause","id":"sec-properties-of-the-%modulesource%-prototype-object","title":"Properties of the %ModuleSource% Prototype Object","titleHTML":"<ins>Properties of the %ModuleSource% Prototype Object</ins>","number":"28.1.5","referencingIds":["_ref_38","_ref_57"]},{"type":"clause","id":"sec-properties-of-modulesource-instances","title":"Properties of ModuleSource Instances","titleHTML":"<ins>Properties of ModuleSource Instances</ins>","number":"28.1.6"},{"type":"op","aoid":"GetModuleSourceSourceTextModuleRecord","refId":"sec-getmodulesourcesourcetextmodulerecord"},{"type":"clause","id":"sec-getmodulesourcesourcetextmodulerecord","title":"GetModuleSourceSourceTextModuleRecord ( M )","titleHTML":"GetModuleSourceSourceTextModuleRecord ( <var>M</var> )","number":"28.1.7.1","referencingIds":["_ref_43"]},{"type":"clause","id":"sec-abstract-operations-for-modulesource-objects","title":"Abstract Operations for ModuleSource Objects","titleHTML":"<ins>Abstract Operations for ModuleSource Objects</ins>","number":"28.1.7"},{"type":"clause","id":"sec-module-source-objects","titleHTML":"Module Source Objects","number":"28.1","referencingIds":["_ref_6","_ref_18","_ref_39","_ref_40","_ref_44"]},{"type":"clause","id":"sec-reflection","titleHTML":"Reflection","number":"28"},{"type":"clause","id":"sec-host-hooks-summary","titleHTML":"Host Hooks","number":"A.1"},{"type":"clause","id":"sec-host-layering-points","titleHTML":"Host Layering Points","number":"A"},{"type":"clause","id":"sec-copyright-and-software-license","title":"Copyright & Software License","titleHTML":"Copyright &amp; Software License","number":"B"}]}`);
+;let usesMultipage = false</script><style>body {
+  display: flex;
+  word-wrap: break-word;
+  font-size: 18px;
+  line-height: 1.5;
+  font-family: Cambria, Palatino Linotype, Palatino, Liberation Serif, serif;
+  padding: 0;
+  margin: 0;
+  color: #111;
+}
+
+#spec-container {
+  padding: 0 20px;
+  flex-grow: 1;
+  flex-basis: 66%;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding-bottom: 1em;
+}
+
+body.oldtoc {
+  margin: 0 auto;
+}
+
+a {
+  text-decoration: none;
+  color: #206ca7;
+}
+
+a:visited {
+  color: #206ca7;
+}
+
+a:hover {
+  text-decoration: underline;
+  color: #239dee;
+}
+
+a.e-user-code,
+span.e-user-code {
+  white-space: nowrap;
+}
+
+a.e-user-code::before,
+span.e-user-code::before {
+  display: none;
+  color: brown;
+  background-color: white;
+  border: 2pt solid brown;
+  padding: 0.3ex;
+  margin: 0 0.25em 0 0;
+  line-height: 1;
+  vertical-align: text-top;
+  text-transform: uppercase;
+  font-family: 'Comic Code', sans-serif;
+  font-weight: 900;
+  font-size: x-small;
+}
+
+a.e-user-code:hover::before,
+span.e-user-code:hover::before {
+  background-color: brown;
+  color: white;
+}
+
+html.show-ao-annotations a.e-user-code::before,
+html.show-ao-annotations span.e-user-code::before {
+  display: inline-block;
+}
+
+a.e-user-code::before,
+span.e-user-code::before {
+  content: 'UC';
+}
+
+code {
+  font-weight: bold;
+  font-family: Consolas, Monaco, monospace;
+  white-space: pre;
+}
+
+pre code {
+  font-weight: inherit;
+}
+
+pre code.hljs {
+  background-color: #fff;
+  margin: 0;
+  padding: 0;
+}
+
+ol.toc {
+  list-style: none;
+  padding-left: 0;
+}
+
+ol.toc ol.toc {
+  padding-left: 2ex;
+  list-style: none;
+}
+
+var {
+  color: #2aa198;
+  transition: background-color 0.25s ease;
+  cursor: pointer;
+}
+var.field {
+  font: inherit;
+  color: inherit;
+}
+
+var.referenced0 {
+  color: inherit;
+  background-color: #ffff33;
+  box-shadow: 0 0 0 2px #ffff33;
+}
+var.referenced1 {
+  color: inherit;
+  background-color: #ff87a2;
+  box-shadow: 0 0 0 2px #ff87a2;
+}
+var.referenced2 {
+  color: inherit;
+  background-color: #96e885;
+  box-shadow: 0 0 0 2px #96e885;
+}
+var.referenced3 {
+  color: inherit;
+  background-color: #3eeed2;
+  box-shadow: 0 0 0 2px #3eeed2;
+}
+var.referenced4 {
+  color: inherit;
+  background-color: #eacfb6;
+  box-shadow: 0 0 0 2px #eacfb6;
+}
+var.referenced5 {
+  color: inherit;
+  background-color: #82ddff;
+  box-shadow: 0 0 0 2px #82ddff;
+}
+var.referenced6 {
+  color: inherit;
+  background-color: #ffbcf2;
+  box-shadow: 0 0 0 2px #ffbcf2;
+}
+
+emu-const {
+  font-family: sans-serif;
+}
+
+emu-val {
+  font-weight: bold;
+}
+
+/* depth 1 */
+emu-alg ol,
+/* depth 4 */
+emu-alg ol ol ol ol,
+emu-alg ol.nested-thrice,
+emu-alg ol.nested-twice ol,
+emu-alg ol.nested-once ol ol {
+  list-style-type: decimal;
+}
+
+/* depth 2 */
+emu-alg ol ol,
+emu-alg ol.nested-once,
+/* depth 5 */
+emu-alg ol ol ol ol ol,
+emu-alg ol.nested-four-times,
+emu-alg ol.nested-thrice ol,
+emu-alg ol.nested-twice ol ol,
+emu-alg ol.nested-once ol ol ol {
+  list-style-type: lower-alpha;
+}
+
+/* depth 3 */
+emu-alg ol ol ol,
+emu-alg ol.nested-twice,
+emu-alg ol.nested-once ol,
+/* depth 6 */
+emu-alg ol ol ol ol ol ol,
+emu-alg ol.nested-lots,
+emu-alg ol.nested-four-times ol,
+emu-alg ol.nested-thrice ol ol,
+emu-alg ol.nested-twice ol ol ol,
+emu-alg ol.nested-once ol ol ol ol,
+/* depth 7+ */
+emu-alg ol.nested-lots ol {
+  list-style-type: lower-roman;
+}
+
+emu-alg [aria-hidden='true'] {
+  font-size: 0;
+}
+
+emu-eqn {
+  display: block;
+  margin-left: 4em;
+}
+
+emu-eqn.inline {
+  display: inline;
+  margin: 0;
+}
+
+emu-eqn div:first-child {
+  margin-left: -2em;
+}
+
+emu-note {
+  margin: 1em 0;
+  display: flex;
+  flex-direction: row;
+  color: inherit;
+  border-left: 5px solid #52e052;
+  background: #e9fbe9;
+  padding: 10px 10px 10px 0;
+}
+
+emu-note > span.note {
+  flex-basis: 100px;
+  min-width: 100px;
+  flex-grow: 0;
+  flex-shrink: 1;
+  text-transform: uppercase;
+  padding-left: 5px;
+}
+
+emu-note[type='editor'] {
+  border-left-color: #faa;
+}
+
+emu-note > div.note-contents {
+  flex-grow: 1;
+  flex-shrink: 1;
+  overflow: auto;
+}
+
+emu-note > div.note-contents > p:first-of-type {
+  margin-top: 0;
+}
+
+emu-note > div.note-contents > p:last-of-type {
+  margin-bottom: 0;
+}
+
+emu-table:not(.code) td code {
+  white-space: normal;
+}
+
+emu-figure {
+  display: block;
+}
+
+emu-example {
+  display: block;
+  margin: 1em 3em;
+}
+
+emu-example figure figcaption {
+  margin-top: 0.5em;
+  text-align: left;
+}
+
+emu-figure figure,
+emu-example figure,
+emu-table figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+emu-production {
+  display: block;
+}
+
+emu-grammar[type='example'] emu-production,
+emu-grammar[type='definition'] emu-production {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  margin-left: 5ex;
+}
+
+emu-grammar.inline,
+emu-production.inline,
+emu-grammar.inline emu-production emu-rhs,
+emu-production.inline emu-rhs,
+emu-grammar[collapsed] emu-production emu-rhs {
+  display: inline;
+  padding-left: 1ex;
+  margin-left: 0;
+}
+
+emu-production[collapsed] emu-rhs {
+  display: inline;
+  padding-left: 0.5ex;
+  margin-left: 0;
+}
+
+emu-grammar[collapsed] emu-production,
+emu-production[collapsed] {
+  margin: 0;
+}
+
+emu-constraints {
+  font-size: 0.75em;
+  margin-right: 0.5ex;
+}
+
+emu-gann {
+  margin-right: 0.5ex;
+}
+
+emu-gann emu-t:last-child,
+emu-gann emu-gprose:last-child,
+emu-gann emu-nt:last-child {
+  margin-right: 0;
+}
+
+emu-geq {
+  margin-left: 0.5ex;
+  font-weight: bold;
+}
+
+emu-oneof {
+  font-weight: bold;
+  margin-left: 0.5ex;
+}
+
+emu-nt {
+  display: inline-block;
+  font-style: italic;
+  white-space: nowrap;
+  text-indent: 0;
+}
+
+emu-nt a,
+emu-nt a:visited {
+  color: #333;
+}
+
+emu-rhs emu-nt {
+  margin-right: 0.5ex;
+}
+
+emu-t {
+  display: inline-block;
+  font-family: monospace;
+  font-weight: bold;
+  white-space: nowrap;
+  text-indent: 0;
+}
+
+emu-production emu-t {
+  margin-right: 0.5ex;
+}
+
+emu-rhs {
+  display: block;
+  padding-left: 75px;
+  text-indent: -25px;
+}
+
+emu-production:not([collapsed]) emu-rhs {
+  border: 0.2ex dashed transparent;
+}
+
+emu-production:not([collapsed]) emu-rhs:hover {
+  border-color: #888;
+  background-color: #f0f0f0;
+}
+
+emu-mods {
+  font-size: 0.85em;
+  vertical-align: sub;
+  font-style: normal;
+  font-weight: normal;
+}
+
+emu-params,
+emu-opt {
+  margin-right: 1ex;
+  font-family: monospace;
+}
+
+emu-params,
+emu-constraints {
+  color: #2aa198;
+}
+
+emu-opt {
+  color: #b58900;
+}
+
+emu-gprose {
+  font-size: 0.9em;
+  font-family: Helvetica, Arial, sans-serif;
+}
+
+emu-production emu-gprose {
+  margin-right: 1ex;
+}
+
+h1.shortname {
+  color: #f60;
+  font-size: 1.5em;
+  margin: 0;
+}
+
+h1.version {
+  color: #f60;
+  font-size: 1.5em;
+}
+
+h1.title {
+  color: #f60;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  position: relative;
+}
+
+h1 .secnum {
+  text-decoration: none;
+  margin-right: 5px;
+}
+
+h1 span.title {
+  order: 2;
+}
+
+h1 {
+  font-size: 2.67em;
+  margin-bottom: 0;
+  line-height: 1em;
+}
+h2 {
+  font-size: 2em;
+}
+h3 {
+  font-size: 1.56em;
+}
+h4 {
+  font-size: 1.25em;
+}
+h5 {
+  font-size: 1.11em;
+}
+h6 {
+  font-size: 1em;
+}
+
+pre code.hljs {
+  background: transparent;
+}
+
+emu-clause[id],
+emu-annex[id],
+emu-intro[id] {
+  scroll-margin-top: 2ex;
+}
+
+emu-intro h1,
+emu-clause h1,
+emu-annex h1 {
+  font-size: 2em;
+}
+emu-intro h2,
+emu-clause h2,
+emu-annex h2 {
+  font-size: 1.56em;
+}
+emu-intro h3,
+emu-clause h3,
+emu-annex h3 {
+  font-size: 1.25em;
+}
+emu-intro h4,
+emu-clause h4,
+emu-annex h4 {
+  font-size: 1.11em;
+}
+emu-intro h5,
+emu-clause h5,
+emu-annex h5 {
+  font-size: 1em;
+}
+emu-intro h6,
+emu-clause h6,
+emu-annex h6 {
+  font-size: 0.9em;
+}
+emu-intro emu-intro h1,
+emu-clause emu-clause h1,
+emu-annex emu-annex h1 {
+  font-size: 1.56em;
+}
+emu-intro emu-intro h2,
+emu-clause emu-clause h2,
+emu-annex emu-annex h2 {
+  font-size: 1.25em;
+}
+emu-intro emu-intro h3,
+emu-clause emu-clause h3,
+emu-annex emu-annex h3 {
+  font-size: 1.11em;
+}
+emu-intro emu-intro h4,
+emu-clause emu-clause h4,
+emu-annex emu-annex h4 {
+  font-size: 1em;
+}
+emu-intro emu-intro h5,
+emu-clause emu-clause h5,
+emu-annex emu-annex h5 {
+  font-size: 0.9em;
+}
+emu-intro emu-intro emu-intro h1,
+emu-clause emu-clause emu-clause h1,
+emu-annex emu-annex emu-annex h1 {
+  font-size: 1.25em;
+}
+emu-intro emu-intro emu-intro h2,
+emu-clause emu-clause emu-clause h2,
+emu-annex emu-annex emu-annex h2 {
+  font-size: 1.11em;
+}
+emu-intro emu-intro emu-intro h3,
+emu-clause emu-clause emu-clause h3,
+emu-annex emu-annex emu-annex h3 {
+  font-size: 1em;
+}
+emu-intro emu-intro emu-intro h4,
+emu-clause emu-clause emu-clause h4,
+emu-annex emu-annex emu-annex h4 {
+  font-size: 0.9em;
+}
+emu-intro emu-intro emu-intro emu-intro h1,
+emu-clause emu-clause emu-clause emu-clause h1,
+emu-annex emu-annex emu-annex emu-annex h1 {
+  font-size: 1.11em;
+}
+emu-intro emu-intro emu-intro emu-intro h2,
+emu-clause emu-clause emu-clause emu-clause h2,
+emu-annex emu-annex emu-annex emu-annex h2 {
+  font-size: 1em;
+}
+emu-intro emu-intro emu-intro emu-intro h3,
+emu-clause emu-clause emu-clause emu-clause h3,
+emu-annex emu-annex emu-annex emu-annex h3 {
+  font-size: 0.9em;
+}
+emu-intro emu-intro emu-intro emu-intro emu-intro h1,
+emu-clause emu-clause emu-clause emu-clause emu-clause h1,
+emu-annex emu-annex emu-annex emu-annex emu-annex h1 {
+  font-size: 1em;
+}
+emu-intro emu-intro emu-intro emu-intro emu-intro h2,
+emu-clause emu-clause emu-clause emu-clause emu-clause h2,
+emu-annex emu-annex emu-annex emu-annex emu-annex h2 {
+  font-size: 0.9em;
+}
+emu-intro emu-intro emu-intro emu-intro emu-intro emu-intro h1,
+emu-clause emu-clause emu-clause emu-clause emu-clause emu-clause h1,
+emu-annex emu-annex emu-annex emu-annex emu-annex emu-annex h1 {
+  font-size: 0.9em;
+}
+
+emu-clause,
+emu-intro,
+emu-annex {
+  display: block;
+}
+
+/* these values are twice the font-size for the <h1> titles for clauses */
+emu-intro,
+emu-clause,
+emu-annex {
+  margin-top: 4em;
+}
+emu-intro emu-intro,
+emu-clause emu-clause,
+emu-annex emu-annex {
+  margin-top: 3.12em;
+}
+emu-intro emu-intro emu-intro,
+emu-clause emu-clause emu-clause,
+emu-annex emu-annex emu-annex {
+  margin-top: 2.5em;
+}
+emu-intro emu-intro emu-intro emu-intro,
+emu-clause emu-clause emu-clause emu-clause,
+emu-annex emu-annex emu-annex emu-annex {
+  margin-top: 2.22em;
+}
+emu-intro emu-intro emu-intro emu-intro emu-intro,
+emu-clause emu-clause emu-clause emu-clause emu-clause,
+emu-annex emu-annex emu-annex emu-annex emu-annex {
+  margin-top: 2em;
+}
+emu-intro emu-intro emu-intro emu-intro emu-intro emu-intro,
+emu-clause emu-clause emu-clause emu-clause emu-clause emu-clause,
+emu-annex emu-annex emu-annex emu-annex emu-annex emu-annex {
+  margin-top: 1.8em;
+}
+
+#spec-container > emu-intro:first-of-type,
+#spec-container > emu-clause:first-of-type,
+#spec-container > emu-annex:first-of-type {
+  margin-top: 0;
+}
+
+/* Figures and tables */
+figure {
+  display: block;
+  margin: 1em 0 3em 0;
+}
+figure object {
+  display: block;
+  margin: 0 auto;
+}
+figure table.real-table {
+  margin: 0 auto;
+}
+figure figcaption {
+  display: block;
+  color: #555555;
+  font-weight: bold;
+  text-align: center;
+}
+
+emu-table table {
+  margin: 0 auto;
+}
+
+emu-table table,
+table.real-table {
+  border-collapse: collapse;
+}
+
+emu-table td,
+emu-table th,
+table.real-table td,
+table.real-table th {
+  border: 1px solid black;
+  padding: 0.4em;
+  vertical-align: baseline;
+}
+emu-table th,
+emu-table thead td,
+table.real-table th {
+  background-color: #eeeeee;
+}
+
+emu-table td {
+  background: #fff;
+}
+
+/* Note: the left content edges of table.lightweight-table >tbody >tr >td
+   and div.display line up. */
+table.lightweight-table {
+  border-collapse: collapse;
+  margin: 0 0 0 1.5em;
+}
+table.lightweight-table td,
+table.lightweight-table th {
+  border: none;
+  padding: 0 0.5em;
+  vertical-align: baseline;
+}
+
+/* diff styles */
+ins {
+  background-color: #e0f8e0;
+  text-decoration: none;
+  border-bottom: 1px solid #396;
+}
+
+del {
+  background-color: #fee;
+}
+
+ins.block,
+del.block,
+emu-production > ins,
+emu-production > del,
+emu-grammar > ins,
+emu-grammar > del {
+  display: block;
+}
+emu-rhs > ins,
+emu-rhs > del {
+  display: inline;
+}
+
+tr.ins > td > ins {
+  border-bottom: none;
+}
+
+tr.ins > td {
+  background-color: #e0f8e0;
+}
+
+tr.del > td {
+  background-color: #fee;
+}
+
+/* Menu Styles */
+#menu-toggle {
+  font-size: 2em;
+
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1.5em;
+  height: 1.5em;
+  z-index: 3;
+  visibility: hidden;
+  color: #1567a2;
+  background-color: #fff;
+
+  line-height: 1.5em;
+  text-align: center;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+
+  cursor: pointer;
+}
+
+#menu {
+  display: flex;
+  flex-direction: column;
+  width: 33%;
+  height: 100vh;
+  max-width: 500px;
+  box-sizing: border-box;
+  background-color: #ddd;
+  overflow: hidden;
+  transition: opacity 0.1s linear;
+  padding: 0 5px;
+  position: fixed;
+  left: 0;
+  top: 0;
+  border-right: 2px solid #bbb;
+
+  z-index: 2;
+}
+
+.menu-spacer {
+  flex-basis: 33%;
+  max-width: 500px;
+  flex-grow: 0;
+  flex-shrink: 0;
+}
+
+#menu a {
+  color: #1567a2;
+}
+
+#menu.active {
+  display: flex;
+  opacity: 1;
+  z-index: 2;
+}
+
+#menu-pins {
+  flex-grow: 1;
+  display: none;
+}
+
+#menu-pins.active {
+  display: block;
+}
+
+#menu-pins-list {
+  margin: 0;
+  padding: 0;
+  counter-reset: pins-counter;
+}
+
+#menu-pins-list > li:before {
+  content: counter(pins-counter);
+  counter-increment: pins-counter;
+  display: inline-block;
+  width: 25px;
+  text-align: center;
+  border: 1px solid #bbb;
+  padding: 2px;
+  margin: 4px;
+  box-sizing: border-box;
+  line-height: 1em;
+  background-color: #ccc;
+  border-radius: 4px;
+}
+#menu-toc > ol {
+  padding: 0;
+  flex-grow: 1;
+}
+
+#menu-toc > ol li {
+  padding: 0;
+}
+
+#menu-toc > ol,
+#menu-toc > ol ol {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+}
+
+#menu-toc > ol ol {
+  padding-left: 0.75em;
+}
+
+#menu-toc li {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+#menu-toc .item-toggle {
+  display: inline-block;
+  transform: rotate(-45deg) translate(-5px, -5px);
+  transition: transform 0.1s ease;
+  text-align: center;
+  width: 20px;
+
+  color: #aab;
+
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+
+  cursor: pointer;
+}
+
+#menu-toc .item-toggle-none {
+  display: inline-block;
+  width: 20px;
+}
+
+#menu-toc li.active > .item-toggle {
+  transform: rotate(45deg) translate(-5px, -5px);
+}
+
+#menu-toc li > ol {
+  display: none;
+}
+
+#menu-toc li.active > ol {
+  display: block;
+}
+
+#menu-toc li.revealed > a {
+  background-color: #bbb;
+  font-weight: bold;
+  /*
+  background-color: #222;
+  color: #c6d8e4;
+  */
+}
+
+#menu-toc li.revealed-leaf > a {
+  color: #206ca7;
+  /*
+  background-color: #222;
+  color: #c6d8e4;
+  */
+}
+
+#menu-toc li.revealed > .item-toggle {
+  transform: rotate(45deg) translate(-5px, -5px);
+}
+
+#menu-toc li.revealed > ol {
+  display: block;
+}
+
+#menu-toc li > a {
+  padding: 2px 5px;
+}
+
+#menu > * {
+  margin-bottom: 5px;
+}
+
+.menu-pane-header {
+  padding: 0 5px;
+  text-transform: uppercase;
+  background-color: #aaa;
+  color: #335;
+  font-weight: bold;
+  letter-spacing: 2px;
+  flex-grow: 0;
+  flex-shrink: 0;
+  font-size: 0.8em;
+}
+
+.menu-pane-header emu-opt,
+.menu-pane-header emu-t,
+.menu-pane-header emu-nt {
+  margin-right: 0px;
+  display: inline;
+  color: inherit;
+}
+
+.menu-pane-header emu-rhs {
+  display: inline;
+  padding-left: 0px;
+  text-indent: 0px;
+}
+
+.menu-pane-header emu-geq {
+  margin-left: 0px;
+}
+
+a.menu-pane-header-production {
+  color: inherit;
+}
+
+.menu-pane-header-production {
+  text-transform: none;
+  letter-spacing: 1.5px;
+  padding-left: 0.5em;
+}
+
+#menu-toc {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  overflow: hidden;
+  flex-grow: 1;
+}
+
+#menu-toc ol.toc {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+#menu-search {
+  position: relative;
+  flex-grow: 0;
+  flex-shrink: 0;
+  width: 100%;
+
+  display: flex;
+  flex-direction: column;
+
+  max-height: 300px;
+}
+
+#menu-trace-list {
+  display: none;
+}
+
+#menu-search-box {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  margin: 5px 0 0 0;
+  font-size: 1em;
+  padding: 2px;
+  background-color: #bbb;
+  border: 1px solid #999;
+}
+
+#menu-search-results {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+li.menu-search-result-clause:before {
+  content: 'clause';
+  width: 40px;
+  display: inline-block;
+  text-align: right;
+  padding-right: 1ex;
+  color: #666;
+  font-size: 75%;
+}
+li.menu-search-result-op:before {
+  content: 'op';
+  width: 40px;
+  display: inline-block;
+  text-align: right;
+  padding-right: 1ex;
+  color: #666;
+  font-size: 75%;
+}
+
+li.menu-search-result-prod:before {
+  content: 'prod';
+  width: 40px;
+  display: inline-block;
+  text-align: right;
+  padding-right: 1ex;
+  color: #666;
+  font-size: 75%;
+}
+
+li.menu-search-result-term:before {
+  content: 'term';
+  width: 40px;
+  display: inline-block;
+  text-align: right;
+  padding-right: 1ex;
+  color: #666;
+  font-size: 75%;
+}
+
+#menu-search-results ul {
+  padding: 0 5px;
+  margin: 0;
+}
+
+#menu-search-results li {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#menu-trace-list {
+  counter-reset: item;
+  margin: 0 0 0 20px;
+  padding: 0;
+}
+#menu-trace-list li {
+  display: block;
+  white-space: nowrap;
+}
+
+#menu-trace-list li .secnum:after {
+  content: ' ';
+}
+#menu-trace-list li:before {
+  content: counter(item) ' ';
+  background-color: #222;
+  counter-increment: item;
+  color: #999;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+  display: inline-block;
+  text-align: center;
+  margin: 2px 4px 2px 0;
+}
+
+@media (max-width: 1000px) {
+  body {
+    margin: 0;
+    display: block;
+  }
+
+  #menu {
+    display: none;
+    padding-top: 3em;
+    width: 450px;
+  }
+
+  #menu.active {
+    position: fixed;
+    height: 100%;
+    left: 0;
+    top: 0;
+    right: 300px;
+  }
+
+  #menu-toggle {
+    visibility: visible;
+  }
+
+  #spec-container {
+    padding: 0 5px;
+  }
+
+  #references-pane-spacer {
+    display: none;
+  }
+}
+
+@media only screen and (max-width: 800px) {
+  #menu {
+    width: 100%;
+  }
+
+  h1 .secnum:empty {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Toolbox */
+.toolbox-container {
+  position: absolute;
+  display: none;
+  padding-bottom: 7px;
+}
+
+.toolbox-container.active {
+  display: inline-block;
+}
+
+.toolbox {
+  position: relative;
+  background: #ddd;
+  border: 1px solid #aaa;
+  color: #eee;
+  padding: 5px;
+  border-radius: 3px;
+}
+
+.toolbox a {
+  text-decoration: none;
+  padding: 0 5px;
+}
+
+.toolbox a:hover {
+  text-decoration: underline;
+}
+
+.toolbox:after,
+.toolbox:before {
+  top: 100%;
+  left: 15px;
+  border: solid transparent;
+  content: ' ';
+  height: 0;
+  width: 0;
+  position: absolute;
+  pointer-events: none;
+}
+
+.toolbox:after {
+  border-color: rgba(0, 0, 0, 0);
+  border-top-color: #ddd;
+  border-width: 10px;
+  margin-left: -10px;
+}
+.toolbox:before {
+  border-color: rgba(204, 204, 204, 0);
+  border-top-color: #aaa;
+  border-width: 12px;
+  margin-left: -12px;
+}
+
+#references-pane-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 250px;
+  display: none;
+  background-color: #ddd;
+  z-index: 1;
+}
+
+#references-pane-table-container {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+#references-pane {
+  flex-grow: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#references-pane-container.active {
+  display: flex;
+}
+
+#references-pane-close:after {
+  content: '✖';
+  float: right;
+  cursor: pointer;
+}
+
+#references-pane table tbody {
+  vertical-align: baseline;
+}
+
+#references-pane table tr td:first-child {
+  text-align: right;
+  padding-right: 5px;
+}
+
+@media print {
+  #menu-toggle {
+    display: none;
+  }
+}
+
+[normative-optional],
+[deprecated],
+[legacy] {
+  border-left: 5px solid #ff6600;
+  padding: 0.5em;
+  background: #ffeedd;
+}
+
+.attributes-tag {
+  text-transform: uppercase;
+  color: #884400;
+}
+
+.attributes-tag a {
+  color: #884400;
+}
+
+/* Shortcuts help dialog */
+
+#shortcuts-help {
+  position: fixed;
+  left: 5%;
+  margin: 0 auto;
+  right: 5%;
+  z-index: 10;
+  top: 10%;
+  top: calc(5vw + 5vh);
+  padding: 30px 90px;
+  max-width: 500px;
+  outline: solid 10000px rgba(255, 255, 255, 0.6);
+  border-radius: 5px;
+  border-width: 1px 1px 0 1px;
+  background-color: #ddd;
+  display: none;
+}
+
+#shortcuts-help.active {
+  display: block;
+}
+
+#shortcuts-help ul {
+  padding: 0;
+}
+
+#shortcuts-help li {
+  display: flex;
+  justify-content: space-between;
+}
+
+#shortcuts-help code {
+  padding: 3px 10px;
+  border-radius: 3px;
+  border-width: 1px 1px 0 1px;
+  border-color: #bbb;
+  background-color: #eee;
+  box-shadow: inset 0 -1px 0 #ccc;
+}
+</style></head><body><div id="shortcuts-help">
+<ul>
+  <li><span>Toggle shortcuts help</span><code>?</code></li>
+  <li><span>Toggle "can call user code" annotations</span><code>u</code></li>
+
+  <li><span>Jump to search box</span><code>/</code></li>
+</ul></div><div id="menu-toggle"><svg xmlns="http://www.w3.org/2000/svg" style="width:100%; height:100%; stroke:currentColor" viewBox="0 0 120 120">
+      <title>Menu</title>
+      <path stroke-width="10" stroke-linecap="round" d="M30,60 h60  M30,30 m0,5 h60  M30,90 m0,-5 h60"></path>
+    </svg></div><div id="menu-spacer" class="menu-spacer"></div><div id="menu"><div id="menu-search"><input type="text" id="menu-search-box" placeholder="Search..."><div id="menu-search-results" class="inactive"></div></div><div id="menu-pins"><div class="menu-pane-header">Pins</div><ul id="menu-pins-list"></ul></div><div class="menu-pane-header">Table of Contents</div><div id="menu-toc"><ol class="toc"><li><span class="item-toggle">◢</span><a href="#sec-ecmascript-data-types-and-values" title="ECMAScript Data Types and Values"><span class="secnum">1</span> ECMAScript Data Types and Values</a><ol class="toc"><li><span class="item-toggle">◢</span><a href="#sec-ecmascript-language-types" title="ECMAScript Language Types"><span class="secnum">1.1</span> ECMAScript Language Types</a><ol class="toc"><li><span class="item-toggle">◢</span><a href="#sec-object-type" title="Object Type"><span class="secnum">1.1.1</span> Object Type</a><ol class="toc"><li><span class="item-toggle-none"></span><a href="#sec-well-known-intrinsic-objects" title="Well-Known Intrinsic Objects"><span class="secnum">1.1.1.1</span> Well-Known Intrinsic Objects</a></li></ol></li></ol></li></ol></li><li><span class="item-toggle">◢</span><a href="#sec-ecmascript-language-expressions" title="ECMAScript Language: Expressions"><span class="secnum">13</span> ECMAScript Language: Expressions</a><ol class="toc"><li><span class="item-toggle">◢</span><a href="#sec-left-hand-side-expressions" title="Left-Hand-Side Expressions"><span class="secnum">13.3</span> Left-Hand-Side Expressions</a><ol class="toc"><li><span class="item-toggle">◢</span><a href="#sec-import-calls" title="Import Calls"><span class="secnum">13.3.10</span> Import Calls</a><ol class="toc"><li><span class="item-toggle-none"></span><a href="#sec-import-call-runtime-semantics-evaluation" title="Runtime Semantics: Evaluation"><span class="secnum">13.3.10.1</span> RS: Evaluation</a></li><li><span class="item-toggle-none"></span><a href="#sec-evaluate-import-call" title="EvaluateImportCall ( specifierExpression, phase )"><span class="secnum">13.3.10.2</span> EvaluateImportCall ( <var>specifierExpression</var>, <var>phase</var> )</a></li></ol></li><li><span class="item-toggle-none"></span><a href="#sec-ContinueDynamicImport" title="ContinueDynamicImport ( promiseCapability, phase, moduleCompletion )"><span class="secnum">13.3.11</span> ContinueDynamicImport ( <var>promiseCapability</var>, <ins><var>phase</var></ins>, <var>moduleCompletion</var> )</a></li></ol></li></ol></li><li><span class="item-toggle">◢</span><a href="#sec-ecmascript-language-scripts-and-modules" title="ECMAScript Language: Scripts and Modules"><span class="secnum">16</span> ECMAScript Language: Scripts and Modules</a><ol class="toc"><li><span class="item-toggle">◢</span><a href="#sec-modules" title="Modules"><span class="secnum">16.1</span> Modules</a><ol class="toc"><li><span class="item-toggle">◢</span><a href="#sec-module-semantics" title="Module Semantics"><span class="secnum">16.1.1</span> Module Semantics</a><ol class="toc"><li><span class="item-toggle-none"></span><a href="#sec-abstract-module-records" title="Abstract Module Records"><span class="secnum">16.1.1.1</span> Abstract Module Records</a></li><li><span class="item-toggle">◢</span><a href="#sec-cyclic-module-records" title="Cyclic Module Records"><span class="secnum">16.1.1.2</span> Cyclic Module Records</a><ol class="toc"><li><span class="item-toggle-none"></span><a href="#sec-modulelistimports" title="ListImports ( )"><span class="secnum">16.1.1.2.1</span> ListImports ( )</a></li><li><span class="item-toggle-none"></span><a href="#sec-modulelistexports" title="ListExports ( )"><span class="secnum">16.1.1.2.2</span> ListExports ( )</a></li></ol></li><li><span class="item-toggle">◢</span><a href="#sec-source-text-module-records" title="Source Text Module Records"><span class="secnum">16.1.1.3</span> Source Text Module Records</a><ol class="toc"><li><span class="item-toggle-none"></span><a href="#sec-source-text-module-record-getmodulesource" title="GetModuleSource ( )"><span class="secnum">16.1.1.3.1</span> GetModuleSource ( )</a></li></ol></li><li><span class="item-toggle-none"></span><a href="#sec-HostGetModuleSourceName" title="HostGetModuleSourceName ( moduleSource )"><span class="secnum">16.1.1.4</span> <del>HostGetModuleSourceName ( <var>moduleSource</var> )</del></a></li><li><span class="item-toggle-none"></span><a href="#sec-HostGetModuleSourceRecord" title="HostGetModuleSourceRecord ( moduleSource )"><span class="secnum">16.1.1.5</span> <ins>HostGetModuleSourceRecord ( <var>moduleSource</var> )</ins></a></li></ol></li></ol></li></ol></li><li><span class="item-toggle">◢</span><a href="#sec-reflection" title="Reflection"><span class="secnum">28</span> Reflection</a><ol class="toc"><li><span class="item-toggle">◢</span><a href="#sec-module-source-objects" title="Module Source Objects"><span class="secnum">28.1</span> Module Source Objects</a><ol class="toc"><li><span class="item-toggle">◢</span><a href="#sec-%abstractmodulesource%-constructor" title="The %AbstractModuleSource% Constructor"><span class="secnum">28.1.1</span> The %AbstractModuleSource% Constructor</a><ol class="toc"><li><span class="item-toggle-none"></span><a href="#sec-%abstractmodulesource%" title="%AbstractModuleSource% ( )"><span class="secnum">28.1.1.1</span> %AbstractModuleSource% ( )</a></li></ol></li><li><span class="item-toggle">◢</span><a href="#sec-properties-of-the-%abstractmodulesource%-intrinsic-object" title="Properties of the %AbstractModuleSource% Intrinsic Object"><span class="secnum">28.1.2</span> Properties of the %AbstractModuleSource% Intrinsic Object</a><ol class="toc"><li><span class="item-toggle-none"></span><a href="#sec-%abstractmodulesource%.prototype" title="%AbstractModuleSource%.prototype"><span class="secnum">28.1.2.1</span> %AbstractModuleSource%.prototype</a></li></ol></li><li><span class="item-toggle">◢</span><a href="#sec-properties-of-the-%abstractmodulesource%-prototype-object" title="Properties of the %AbstractModuleSource% Prototype Object"><span class="secnum">28.1.3</span> Properties of the %AbstractModuleSource% Prototype Object</a><ol class="toc"><li><span class="item-toggle-none"></span><a href="#sec-%abstractmodulesource%.prototype.constructor" title="%AbstractModuleSource%.prototype.constructor"><span class="secnum">28.1.3.1</span> %AbstractModuleSource%.prototype.constructor</a></li><li><span class="item-toggle-none"></span><a href="#sec-get-%abstractmodulesource%.prototype.@@tostringtag" title="get %AbstractModuleSource%.prototype [ @@toStringTag ]"><span class="secnum">28.1.3.2</span> get %AbstractModuleSource%.prototype [ @@toStringTag ]</a></li><li><span class="item-toggle-none"></span><a href="#sec-%abstractmodulesource%.prototype.imports" title="%AbstractModuleSource%.prototype.imports ( )"><span class="secnum">28.1.3.3</span> <ins>%AbstractModuleSource%.prototype.imports ( )</ins></a></li><li><span class="item-toggle-none"></span><a href="#sec-%abstractmodulesource%.prototype.exports" title="%AbstractModuleSource%.prototype.exports ( )"><span class="secnum">28.1.3.4</span> <ins>%AbstractModuleSource%.prototype.exports ( )</ins></a></li></ol></li><li><span class="item-toggle">◢</span><a href="#sec-module-source-object" title="The %ModuleSource% Constructor"><span class="secnum">28.1.4</span> <ins>The %ModuleSource% Constructor</ins></a><ol class="toc"><li><span class="item-toggle-none"></span><a href="#sec-%modulesource%" title="%ModuleSource% ( )"><span class="secnum">28.1.4.1</span> %ModuleSource% ( )</a></li></ol></li><li><span class="item-toggle">◢</span><a href="#sec-properties-of-the-%modulesource%-prototype-object" title="Properties of the %ModuleSource% Prototype Object"><span class="secnum">28.1.5</span> <ins>Properties of the %ModuleSource% Prototype Object</ins></a><ol class="toc"><li><span class="item-toggle-none"></span><a href="#sec-%modulesource%.prototype.constructor" title="%ModuleSource%.prototype.constructor"><span class="secnum">28.1.5.1</span> <ins>%ModuleSource%.prototype.constructor</ins></a></li></ol></li><li><span class="item-toggle-none"></span><a href="#sec-properties-of-modulesource-instances" title="Properties of ModuleSource Instances"><span class="secnum">28.1.6</span> <ins>Properties of ModuleSource Instances</ins></a></li><li><span class="item-toggle">◢</span><a href="#sec-abstract-operations-for-modulesource-objects" title="Abstract Operations for ModuleSource Objects"><span class="secnum">28.1.7</span> <ins>Abstract Operations for ModuleSource Objects</ins></a><ol class="toc"><li><span class="item-toggle-none"></span><a href="#sec-getmodulesourcesourcetextmodulerecord" title="GetModuleSourceSourceTextModuleRecord ( M )"><span class="secnum">28.1.7.1</span> GetModuleSourceSourceTextModuleRecord ( <var>M</var> )</a></li></ol></li></ol></li></ol></li><li><span class="item-toggle">◢</span><a href="#sec-host-layering-points" title="Host Layering Points"><span class="secnum">A</span> Host Layering Points</a><ol class="toc"><li><span class="item-toggle-none"></span><a href="#sec-host-hooks-summary" title="Host Hooks"><span class="secnum">A.1</span> Host Hooks</a></li></ol></li><li><span class="item-toggle-none"></span><a href="#sec-copyright-and-software-license" title="Copyright &amp; Software License"><span class="secnum">B</span> Copyright &amp; Software License</a></li></ol></div></div><div id="spec-container"><h1 class="version">Stage 1 Draft / May 3, 2024</h1><h1 class="title">ECMAScript Module Phase Imports</h1>
+
+<emu-clause id="sec-ecmascript-data-types-and-values" aoid="Type">
+  <h1><span class="secnum">1</span> ECMAScript Data Types and Values</h1>
+  <emu-clause id="sec-ecmascript-language-types">
+    <h1><span class="secnum">1.1</span> ECMAScript Language Types</h1>
+    <emu-clause id="sec-object-type">
+      <h1><span class="secnum">1.1.1</span> Object Type</h1>
+      <emu-clause id="sec-well-known-intrinsic-objects">
+        <h1><span class="secnum">1.1.1.1</span> Well-Known Intrinsic Objects</h1>
+        <p>Well-known intrinsics are built-in objects that are explicitly referenced by the algorithms of this specification and which usually have <emu-xref href="#realm"><a href="https://tc39.es/ecma262/#realm">realm</a></emu-xref>-specific identities. Unless otherwise specified each intrinsic object actually corresponds to a set of similar objects, one per <emu-xref href="#realm"><a href="https://tc39.es/ecma262/#realm">realm</a></emu-xref>.</p>
+        <p>Within this specification a reference such as %name% means the intrinsic object, associated with the current <emu-xref href="#realm"><a href="https://tc39.es/ecma262/#realm">realm</a></emu-xref>, corresponding to the name. A reference such as %name.a.b% means, as if the <emu-val>"b"</emu-val> property of the value of the <emu-val>"a"</emu-val> property of the intrinsic object %name% was accessed prior to any ECMAScript code being evaluated. Determination of the current <emu-xref href="#realm"><a href="https://tc39.es/ecma262/#realm">realm</a></emu-xref> and its intrinsics is described in <emu-xref href="#sec-execution-contexts"><a href="https://tc39.es/ecma262/#sec-execution-contexts">9.4</a></emu-xref>. The well-known intrinsics are listed in <emu-xref href="#table-well-known-intrinsic-objects" id="_ref_0"><a href="#table-well-known-intrinsic-objects">Table 1</a></emu-xref>.</p>
+        <emu-table id="table-well-known-intrinsic-objects" caption="Well-Known Intrinsic Objects" oldids="table-7"><figure><figcaption>Table 1: Well-Known Intrinsic Objects</figcaption><span id="table-7"></span>
+          <table>
+            <tbody><tr>
+              <th>
+                Intrinsic Name
+              </th>
+              <th>
+                Global Name
+              </th>
+              <th>
+                ECMAScript Language Association
+              </th>
+            </tr>
+            <tr>
+              <td>
+                %AbstractModuleSource%
+              </td>
+              <td>
+              </td>
+              <td>
+                The %AbstractModuleSource% <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-%abstractmodulesource%-constructor" id="_ref_1"><a href="#sec-%abstractmodulesource%-constructor">28.1.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-aggregate-error-constructor"><a href="https://tc39.es/ecma262/#sec-aggregate-error-constructor">%AggregateError%</a></emu-xref>
+              </td>
+              <td>
+                <code>AggregateError</code>
+              </td>
+              <td>
+                The <code>AggregateError</code> <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-aggregate-error-constructor"><a href="https://tc39.es/ecma262/#sec-aggregate-error-constructor">20.5.7.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-array-constructor"><a href="https://tc39.es/ecma262/#sec-array-constructor">%Array%</a></emu-xref>
+              </td>
+              <td>
+                <code>Array</code>
+              </td>
+              <td>
+                The Array <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-array-constructor"><a href="https://tc39.es/ecma262/#sec-array-constructor">23.1.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-arraybuffer-constructor"><a href="https://tc39.es/ecma262/#sec-arraybuffer-constructor">%ArrayBuffer%</a></emu-xref>
+              </td>
+              <td>
+                <code>ArrayBuffer</code>
+              </td>
+              <td>
+                The ArrayBuffer <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-arraybuffer-constructor"><a href="https://tc39.es/ecma262/#sec-arraybuffer-constructor">25.1.3</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-%arrayiteratorprototype%-object"><a href="https://tc39.es/ecma262/#sec-%arrayiteratorprototype%-object">%ArrayIteratorPrototype%</a></emu-xref>
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of Array iterator objects (<emu-xref href="#sec-array-iterator-objects"><a href="https://tc39.es/ecma262/#sec-array-iterator-objects">23.1.5</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-%asyncfromsynciteratorprototype%-object"><a href="https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%-object">%AsyncFromSyncIteratorPrototype%</a></emu-xref>
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of async-from-sync iterator objects (<emu-xref href="#sec-async-from-sync-iterator-objects"><a href="https://tc39.es/ecma262/#sec-async-from-sync-iterator-objects">27.1.4</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-async-function-constructor"><a href="https://tc39.es/ecma262/#sec-async-function-constructor">%AsyncFunction%</a></emu-xref>
+              </td>
+              <td>
+              </td>
+              <td>
+                The <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> of async <emu-xref href="#function-object"><a href="https://tc39.es/ecma262/#function-object">function objects</a></emu-xref> (<emu-xref href="#sec-async-function-constructor"><a href="https://tc39.es/ecma262/#sec-async-function-constructor">27.7.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-asyncgeneratorfunction-constructor"><a href="https://tc39.es/ecma262/#sec-asyncgeneratorfunction-constructor">%AsyncGeneratorFunction%</a></emu-xref>
+              </td>
+              <td>
+              </td>
+              <td>
+                The <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> of async generator <emu-xref href="#function-object"><a href="https://tc39.es/ecma262/#function-object">function objects</a></emu-xref> (<emu-xref href="#sec-asyncgeneratorfunction-constructor"><a href="https://tc39.es/ecma262/#sec-asyncgeneratorfunction-constructor">27.4.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %AsyncGeneratorPrototype%
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of async generator objects (<emu-xref href="#sec-asyncgenerator-objects"><a href="https://tc39.es/ecma262/#sec-asyncgenerator-objects">27.6</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-asynciteratorprototype"><a href="https://tc39.es/ecma262/#sec-asynciteratorprototype">%AsyncIteratorPrototype%</a></emu-xref>
+              </td>
+              <td>
+              </td>
+              <td>
+                An object that all standard built-in async iterator objects indirectly inherit from
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-atomics-object"><a href="https://tc39.es/ecma262/#sec-atomics-object">%Atomics%</a></emu-xref>
+              </td>
+              <td>
+                <code>Atomics</code>
+              </td>
+              <td>
+                The <code>Atomics</code> object (<emu-xref href="#sec-atomics-object"><a href="https://tc39.es/ecma262/#sec-atomics-object">25.4</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-bigint-constructor"><a href="https://tc39.es/ecma262/#sec-bigint-constructor">%BigInt%</a></emu-xref>
+              </td>
+              <td>
+                <code>BigInt</code>
+              </td>
+              <td>
+                The BigInt <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-bigint-constructor"><a href="https://tc39.es/ecma262/#sec-bigint-constructor">21.2.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">%BigInt64Array%</a></emu-xref>
+              </td>
+              <td>
+                <code>BigInt64Array</code>
+              </td>
+              <td>
+                The BigInt64Array <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">23.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">%BigUint64Array%</a></emu-xref>
+              </td>
+              <td>
+                <code>BigUint64Array</code>
+              </td>
+              <td>
+                The BigUint64Array <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">23.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-boolean-constructor"><a href="https://tc39.es/ecma262/#sec-boolean-constructor">%Boolean%</a></emu-xref>
+              </td>
+              <td>
+                <code>Boolean</code>
+              </td>
+              <td>
+                The Boolean <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-boolean-constructor"><a href="https://tc39.es/ecma262/#sec-boolean-constructor">20.3.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-dataview-constructor"><a href="https://tc39.es/ecma262/#sec-dataview-constructor">%DataView%</a></emu-xref>
+              </td>
+              <td>
+                <code>DataView</code>
+              </td>
+              <td>
+                The DataView <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-dataview-constructor"><a href="https://tc39.es/ecma262/#sec-dataview-constructor">25.3.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-date-constructor"><a href="https://tc39.es/ecma262/#sec-date-constructor">%Date%</a></emu-xref>
+              </td>
+              <td>
+                <code>Date</code>
+              </td>
+              <td>
+                The Date <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-date-constructor"><a href="https://tc39.es/ecma262/#sec-date-constructor">21.4.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-decodeuri-encodeduri"><a href="https://tc39.es/ecma262/#sec-decodeuri-encodeduri">%decodeURI%</a></emu-xref>
+              </td>
+              <td>
+                <code>decodeURI</code>
+              </td>
+              <td>
+                The <code>decodeURI</code> function (<emu-xref href="#sec-decodeuri-encodeduri"><a href="https://tc39.es/ecma262/#sec-decodeuri-encodeduri">19.2.6.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-decodeuricomponent-encodeduricomponent"><a href="https://tc39.es/ecma262/#sec-decodeuricomponent-encodeduricomponent">%decodeURIComponent%</a></emu-xref>
+              </td>
+              <td>
+                <code>decodeURIComponent</code>
+              </td>
+              <td>
+                The <code>decodeURIComponent</code> function (<emu-xref href="#sec-decodeuricomponent-encodeduricomponent"><a href="https://tc39.es/ecma262/#sec-decodeuricomponent-encodeduricomponent">19.2.6.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-encodeuri-uri"><a href="https://tc39.es/ecma262/#sec-encodeuri-uri">%encodeURI%</a></emu-xref>
+              </td>
+              <td>
+                <code>encodeURI</code>
+              </td>
+              <td>
+                The <code>encodeURI</code> function (<emu-xref href="#sec-encodeuri-uri"><a href="https://tc39.es/ecma262/#sec-encodeuri-uri">19.2.6.3</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-encodeuricomponent-uricomponent"><a href="https://tc39.es/ecma262/#sec-encodeuricomponent-uricomponent">%encodeURIComponent%</a></emu-xref>
+              </td>
+              <td>
+                <code>encodeURIComponent</code>
+              </td>
+              <td>
+                The <code>encodeURIComponent</code> function (<emu-xref href="#sec-encodeuricomponent-uricomponent"><a href="https://tc39.es/ecma262/#sec-encodeuricomponent-uricomponent">19.2.6.4</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-error-constructor"><a href="https://tc39.es/ecma262/#sec-error-constructor">%Error%</a></emu-xref>
+              </td>
+              <td>
+                <code>Error</code>
+              </td>
+              <td>
+                The Error <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-error-constructor"><a href="https://tc39.es/ecma262/#sec-error-constructor">20.5.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-eval-x"><a href="https://tc39.es/ecma262/#sec-eval-x">%eval%</a></emu-xref>
+              </td>
+              <td>
+                <code>eval</code>
+              </td>
+              <td>
+                The <code>eval</code> function (<emu-xref href="#sec-eval-x"><a href="https://tc39.es/ecma262/#sec-eval-x">19.2.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-native-error-types-used-in-this-standard-evalerror"><a href="https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-evalerror">%EvalError%</a></emu-xref>
+              </td>
+              <td>
+                <code>EvalError</code>
+              </td>
+              <td>
+                The EvalError <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-native-error-types-used-in-this-standard-evalerror"><a href="https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-evalerror">20.5.5.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-finalization-registry-constructor"><a href="https://tc39.es/ecma262/#sec-finalization-registry-constructor">%FinalizationRegistry%</a></emu-xref>
+              </td>
+              <td>
+                <code>FinalizationRegistry</code>
+              </td>
+              <td>
+                The <emu-xref href="#sec-finalization-registry-constructor"><a href="https://tc39.es/ecma262/#sec-finalization-registry-constructor">FinalizationRegistry</a></emu-xref> <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-finalization-registry-constructor"><a href="https://tc39.es/ecma262/#sec-finalization-registry-constructor">26.2.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">%Float32Array%</a></emu-xref>
+              </td>
+              <td>
+                <code>Float32Array</code>
+              </td>
+              <td>
+                The Float32Array <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">23.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">%Float64Array%</a></emu-xref>
+              </td>
+              <td>
+                <code>Float64Array</code>
+              </td>
+              <td>
+                The Float64Array <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">23.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-%foriniteratorprototype%-object"><a href="https://tc39.es/ecma262/#sec-%foriniteratorprototype%-object">%ForInIteratorPrototype%</a></emu-xref>
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of For-In iterator objects (<emu-xref href="#sec-for-in-iterator-objects"><a href="https://tc39.es/ecma262/#sec-for-in-iterator-objects">14.7.5.10</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-function-constructor"><a href="https://tc39.es/ecma262/#sec-function-constructor">%Function%</a></emu-xref>
+              </td>
+              <td>
+                <code>Function</code>
+              </td>
+              <td>
+                The Function <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-function-constructor"><a href="https://tc39.es/ecma262/#sec-function-constructor">20.2.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-generatorfunction-constructor"><a href="https://tc39.es/ecma262/#sec-generatorfunction-constructor">%GeneratorFunction%</a></emu-xref>
+              </td>
+              <td>
+              </td>
+              <td>
+                The <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> of generator <emu-xref href="#function-object"><a href="https://tc39.es/ecma262/#function-object">function objects</a></emu-xref> (<emu-xref href="#sec-generatorfunction-constructor"><a href="https://tc39.es/ecma262/#sec-generatorfunction-constructor">27.3.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %GeneratorPrototype%
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of generator objects (<emu-xref href="#sec-generator-objects"><a href="https://tc39.es/ecma262/#sec-generator-objects">27.5</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">%Int8Array%</a></emu-xref>
+              </td>
+              <td>
+                <code>Int8Array</code>
+              </td>
+              <td>
+                The Int8Array <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">23.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">%Int16Array%</a></emu-xref>
+              </td>
+              <td>
+                <code>Int16Array</code>
+              </td>
+              <td>
+                The Int16Array <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">23.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">%Int32Array%</a></emu-xref>
+              </td>
+              <td>
+                <code>Int32Array</code>
+              </td>
+              <td>
+                The Int32Array <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">23.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-isfinite-number"><a href="https://tc39.es/ecma262/#sec-isfinite-number">%isFinite%</a></emu-xref>
+              </td>
+              <td>
+                <code>isFinite</code>
+              </td>
+              <td>
+                The <code>isFinite</code> function (<emu-xref href="#sec-isfinite-number"><a href="https://tc39.es/ecma262/#sec-isfinite-number">19.2.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-isnan-number"><a href="https://tc39.es/ecma262/#sec-isnan-number">%isNaN%</a></emu-xref>
+              </td>
+              <td>
+                <code>isNaN</code>
+              </td>
+              <td>
+                The <code>isNaN</code> function (<emu-xref href="#sec-isnan-number"><a href="https://tc39.es/ecma262/#sec-isnan-number">19.2.3</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-%iteratorprototype%-object"><a href="https://tc39.es/ecma262/#sec-%iteratorprototype%-object">%IteratorPrototype%</a></emu-xref>
+              </td>
+              <td>
+              </td>
+              <td>
+                An object that all standard built-in iterator objects indirectly inherit from
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-json-object"><a href="https://tc39.es/ecma262/#sec-json-object">%JSON%</a></emu-xref>
+              </td>
+              <td>
+                <code>JSON</code>
+              </td>
+              <td>
+                The <code>JSON</code> object (<emu-xref href="#sec-json-object"><a href="https://tc39.es/ecma262/#sec-json-object">25.5</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-map-constructor"><a href="https://tc39.es/ecma262/#sec-map-constructor">%Map%</a></emu-xref>
+              </td>
+              <td>
+                <code>Map</code>
+              </td>
+              <td>
+                The Map <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-map-constructor"><a href="https://tc39.es/ecma262/#sec-map-constructor">24.1.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-%mapiteratorprototype%-object"><a href="https://tc39.es/ecma262/#sec-%mapiteratorprototype%-object">%MapIteratorPrototype%</a></emu-xref>
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of Map iterator objects (<emu-xref href="#sec-map-iterator-objects"><a href="https://tc39.es/ecma262/#sec-map-iterator-objects">24.1.5</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-math-object"><a href="https://tc39.es/ecma262/#sec-math-object">%Math%</a></emu-xref>
+              </td>
+              <td>
+                <code>Math</code>
+              </td>
+              <td>
+                The <code>Math</code> object (<emu-xref href="#sec-math-object"><a href="https://tc39.es/ecma262/#sec-math-object">21.3</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <ins>%ModuleSource%</ins>
+              </td>
+              <td>
+                <ins><code>ModuleSource</code></ins>
+              </td>
+              <td>
+                <ins>A <code>ModuleSource</code> object (<emu-xref href="#sec-module-source-object" id="_ref_2"><a href="#sec-module-source-object">28.1.4</a></emu-xref>)</ins>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-number-constructor"><a href="https://tc39.es/ecma262/#sec-number-constructor">%Number%</a></emu-xref>
+              </td>
+              <td>
+                <code>Number</code>
+              </td>
+              <td>
+                The Number <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-number-constructor"><a href="https://tc39.es/ecma262/#sec-number-constructor">21.1.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-object-constructor"><a href="https://tc39.es/ecma262/#sec-object-constructor">%Object%</a></emu-xref>
+              </td>
+              <td>
+                <code>Object</code>
+              </td>
+              <td>
+                The Object <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-object-constructor"><a href="https://tc39.es/ecma262/#sec-object-constructor">20.1.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-parsefloat-string"><a href="https://tc39.es/ecma262/#sec-parsefloat-string">%parseFloat%</a></emu-xref>
+              </td>
+              <td>
+                <code>parseFloat</code>
+              </td>
+              <td>
+                The <code>parseFloat</code> function (<emu-xref href="#sec-parsefloat-string"><a href="https://tc39.es/ecma262/#sec-parsefloat-string">19.2.4</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-parseint-string-radix"><a href="https://tc39.es/ecma262/#sec-parseint-string-radix">%parseInt%</a></emu-xref>
+              </td>
+              <td>
+                <code>parseInt</code>
+              </td>
+              <td>
+                The <code>parseInt</code> function (<emu-xref href="#sec-parseint-string-radix"><a href="https://tc39.es/ecma262/#sec-parseint-string-radix">19.2.5</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-promise-constructor"><a href="https://tc39.es/ecma262/#sec-promise-constructor">%Promise%</a></emu-xref>
+              </td>
+              <td>
+                <code>Promise</code>
+              </td>
+              <td>
+                The Promise <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-promise-constructor"><a href="https://tc39.es/ecma262/#sec-promise-constructor">27.2.3</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-proxy-constructor"><a href="https://tc39.es/ecma262/#sec-proxy-constructor">%Proxy%</a></emu-xref>
+              </td>
+              <td>
+                <code>Proxy</code>
+              </td>
+              <td>
+                The Proxy <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-proxy-constructor"><a href="https://tc39.es/ecma262/#sec-proxy-constructor">28.2.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-native-error-types-used-in-this-standard-rangeerror"><a href="https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-rangeerror">%RangeError%</a></emu-xref>
+              </td>
+              <td>
+                <code>RangeError</code>
+              </td>
+              <td>
+                The RangeError <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-native-error-types-used-in-this-standard-rangeerror"><a href="https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-rangeerror">20.5.5.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-native-error-types-used-in-this-standard-referenceerror"><a href="https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-referenceerror">%ReferenceError%</a></emu-xref>
+              </td>
+              <td>
+                <code>ReferenceError</code>
+              </td>
+              <td>
+                The ReferenceError <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-native-error-types-used-in-this-standard-referenceerror"><a href="https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-referenceerror">20.5.5.3</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-reflect-object"><a href="https://tc39.es/ecma262/#sec-reflect-object">%Reflect%</a></emu-xref>
+              </td>
+              <td>
+                <code>Reflect</code>
+              </td>
+              <td>
+                The <code>Reflect</code> object (<emu-xref href="#sec-reflect-object"><a href="https://tc39.es/ecma262/#sec-reflect-object">28.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-regexp-constructor"><a href="https://tc39.es/ecma262/#sec-regexp-constructor">%RegExp%</a></emu-xref>
+              </td>
+              <td>
+                <code>RegExp</code>
+              </td>
+              <td>
+                The RegExp <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-regexp-constructor"><a href="https://tc39.es/ecma262/#sec-regexp-constructor">22.2.4</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-%regexpstringiteratorprototype%-object"><a href="https://tc39.es/ecma262/#sec-%regexpstringiteratorprototype%-object">%RegExpStringIteratorPrototype%</a></emu-xref>
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of RegExp String Iterator objects (<emu-xref href="#sec-regexp-string-iterator-objects"><a href="https://tc39.es/ecma262/#sec-regexp-string-iterator-objects">22.2.9</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-set-constructor"><a href="https://tc39.es/ecma262/#sec-set-constructor">%Set%</a></emu-xref>
+              </td>
+              <td>
+                <code>Set</code>
+              </td>
+              <td>
+                The Set <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-set-constructor"><a href="https://tc39.es/ecma262/#sec-set-constructor">24.2.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-%setiteratorprototype%-object"><a href="https://tc39.es/ecma262/#sec-%setiteratorprototype%-object">%SetIteratorPrototype%</a></emu-xref>
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of Set iterator objects (<emu-xref href="#sec-set-iterator-objects"><a href="https://tc39.es/ecma262/#sec-set-iterator-objects">24.2.5</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-sharedarraybuffer-constructor"><a href="https://tc39.es/ecma262/#sec-sharedarraybuffer-constructor">%SharedArrayBuffer%</a></emu-xref>
+              </td>
+              <td>
+                <code>SharedArrayBuffer</code>
+              </td>
+              <td>
+                The SharedArrayBuffer <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-sharedarraybuffer-constructor"><a href="https://tc39.es/ecma262/#sec-sharedarraybuffer-constructor">25.2.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-string-constructor"><a href="https://tc39.es/ecma262/#sec-string-constructor">%String%</a></emu-xref>
+              </td>
+              <td>
+                <code>String</code>
+              </td>
+              <td>
+                The String <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-string-constructor"><a href="https://tc39.es/ecma262/#sec-string-constructor">22.1.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-%stringiteratorprototype%-object"><a href="https://tc39.es/ecma262/#sec-%stringiteratorprototype%-object">%StringIteratorPrototype%</a></emu-xref>
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of String iterator objects (<emu-xref href="#sec-string-iterator-objects"><a href="https://tc39.es/ecma262/#sec-string-iterator-objects">22.1.5</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-symbol-constructor"><a href="https://tc39.es/ecma262/#sec-symbol-constructor">%Symbol%</a></emu-xref>
+              </td>
+              <td>
+                <code>Symbol</code>
+              </td>
+              <td>
+                The Symbol <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-symbol-constructor"><a href="https://tc39.es/ecma262/#sec-symbol-constructor">20.4.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-native-error-types-used-in-this-standard-syntaxerror"><a href="https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-syntaxerror">%SyntaxError%</a></emu-xref>
+              </td>
+              <td>
+                <code>SyntaxError</code>
+              </td>
+              <td>
+                The SyntaxError <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-native-error-types-used-in-this-standard-syntaxerror"><a href="https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-syntaxerror">20.5.5.4</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-%throwtypeerror%"><a href="https://tc39.es/ecma262/#sec-%throwtypeerror%">%ThrowTypeError%</a></emu-xref>
+              </td>
+              <td>
+              </td>
+              <td>
+                A <emu-xref href="#function-object"><a href="https://tc39.es/ecma262/#function-object">function object</a></emu-xref> that unconditionally throws a new instance of <emu-xref href="#sec-native-error-types-used-in-this-standard-typeerror"><a href="https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-typeerror">%TypeError%</a></emu-xref>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-%typedarray%-intrinsic-object"><a href="https://tc39.es/ecma262/#sec-%typedarray%-intrinsic-object">%TypedArray%</a></emu-xref>
+              </td>
+              <td>
+              </td>
+              <td>
+                The super class of all typed Array <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructors</a></emu-xref> (<emu-xref href="#sec-%typedarray%-intrinsic-object"><a href="https://tc39.es/ecma262/#sec-%typedarray%-intrinsic-object">23.2.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-native-error-types-used-in-this-standard-typeerror"><a href="https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-typeerror">%TypeError%</a></emu-xref>
+              </td>
+              <td>
+                <code>TypeError</code>
+              </td>
+              <td>
+                The TypeError <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-native-error-types-used-in-this-standard-typeerror"><a href="https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-typeerror">20.5.5.5</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">%Uint8Array%</a></emu-xref>
+              </td>
+              <td>
+                <code>Uint8Array</code>
+              </td>
+              <td>
+                The Uint8Array <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">23.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">%Uint8ClampedArray%</a></emu-xref>
+              </td>
+              <td>
+                <code>Uint8ClampedArray</code>
+              </td>
+              <td>
+                The Uint8ClampedArray <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">23.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">%Uint16Array%</a></emu-xref>
+              </td>
+              <td>
+                <code>Uint16Array</code>
+              </td>
+              <td>
+                The Uint16Array <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">23.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">%Uint32Array%</a></emu-xref>
+              </td>
+              <td>
+                <code>Uint32Array</code>
+              </td>
+              <td>
+                The Uint32Array <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-typedarray-objects"><a href="https://tc39.es/ecma262/#sec-typedarray-objects">23.2</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-native-error-types-used-in-this-standard-urierror"><a href="https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-urierror">%URIError%</a></emu-xref>
+              </td>
+              <td>
+                <code>URIError</code>
+              </td>
+              <td>
+                The URIError <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-native-error-types-used-in-this-standard-urierror"><a href="https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-urierror">20.5.5.6</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-weakmap-constructor"><a href="https://tc39.es/ecma262/#sec-weakmap-constructor">%WeakMap%</a></emu-xref>
+              </td>
+              <td>
+                <code>WeakMap</code>
+              </td>
+              <td>
+                The WeakMap <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-weakmap-constructor"><a href="https://tc39.es/ecma262/#sec-weakmap-constructor">24.3.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-weak-ref-constructor"><a href="https://tc39.es/ecma262/#sec-weak-ref-constructor">%WeakRef%</a></emu-xref>
+              </td>
+              <td>
+                <code>WeakRef</code>
+              </td>
+              <td>
+                The <emu-xref href="#sec-weak-ref-constructor"><a href="https://tc39.es/ecma262/#sec-weak-ref-constructor">WeakRef</a></emu-xref> <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-weak-ref-constructor"><a href="https://tc39.es/ecma262/#sec-weak-ref-constructor">26.1.1</a></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <emu-xref href="#sec-weakset-constructor"><a href="https://tc39.es/ecma262/#sec-weakset-constructor">%WeakSet%</a></emu-xref>
+              </td>
+              <td>
+                <code>WeakSet</code>
+              </td>
+              <td>
+                The WeakSet <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref> (<emu-xref href="#sec-weakset-constructor"><a href="https://tc39.es/ecma262/#sec-weakset-constructor">24.4.1</a></emu-xref>)
+              </td>
+            </tr>
+          </tbody></table>
+        </figure></emu-table>
+        <emu-note><span class="note">Note</span><div class="note-contents">
+          <p>Additional entries in <emu-xref href="#table-additional-well-known-intrinsic-objects"><a href="https://tc39.es/ecma262/#table-additional-well-known-intrinsic-objects">Table 95</a></emu-xref>.</p>
+        </div></emu-note>
+      </emu-clause>
+    </emu-clause>
+  </emu-clause>
+</emu-clause>
+
+<emu-clause id="sec-ecmascript-language-expressions" number="13">
+  <h1><span class="secnum">13</span> ECMAScript Language: Expressions</h1>
+
+  <emu-clause id="sec-left-hand-side-expressions" number="3">
+    <h1><span class="secnum">13.3</span> Left-Hand-Side Expressions</h1>
+    <h2>Syntax</h2>
+    <emu-grammar type="definition"><emu-production name="ImportCall" params="Yield, Await" id="prod-ImportCall">
+    <emu-nt params="Yield, Await"><a href="#prod-ImportCall">ImportCall</a><emu-mods><emu-params>[Yield, Await]</emu-params></emu-mods></emu-nt> <emu-geq>:</emu-geq> <emu-rhs a="s_udh2yu" id="prod-uZn3IQfi">
+        <emu-t>import</emu-t>
+        <emu-t>(</emu-t>
+        <emu-nt params="+In, ?Yield, ?Await"><a href="https://tc39.es/ecma262/#prod-AssignmentExpression">AssignmentExpression</a><emu-mods><emu-params>[+In, ?Yield, ?Await]</emu-params></emu-mods></emu-nt>
+        <emu-t>)</emu-t>
+    </emu-rhs>
+    <emu-rhs a="squwtgf4" id="prod-WqUZkrPx">
+        <emu-t>import</emu-t>
+        <emu-t>.</emu-t>
+        <emu-t>source</emu-t>
+        <emu-t>(</emu-t>
+        <emu-nt params="+In, ?Yield, ?Await"><a href="https://tc39.es/ecma262/#prod-AssignmentExpression">AssignmentExpression</a><emu-mods><emu-params>[+In, ?Yield, ?Await]</emu-params></emu-mods></emu-nt>
+        <emu-t>)</emu-t>
+    </emu-rhs>
+</emu-production>
+</emu-grammar>
+
+    <emu-clause id="sec-import-calls" number="10">
+      <h1><span class="secnum">13.3.10</span> Import Calls</h1>
+
+      <emu-clause id="sec-import-call-runtime-semantics-evaluation" type="sdo">
+        <h1><span class="secnum">13.3.10.1</span> Runtime Semantics: Evaluation</h1>
+
+        <emu-grammar><emu-production name="ImportCall" collapsed="">
+    <emu-nt><a href="#prod-ImportCall">ImportCall</a></emu-nt> <emu-geq>:</emu-geq> <emu-rhs a="s_udh2yu" id="prod-4N8EtSSM">
+        <emu-t>import</emu-t>
+        <emu-t>(</emu-t>
+        <emu-nt params="+In, ?Yield, ?Await"><a href="https://tc39.es/ecma262/#prod-AssignmentExpression">AssignmentExpression</a><emu-mods><emu-params>[+In, ?Yield, ?Await]</emu-params></emu-mods></emu-nt>
+        <emu-t>)</emu-t>
+    </emu-rhs>
+</emu-production>
+</emu-grammar>
+        <emu-alg><ol><li>Return ?&nbsp;<emu-xref aoid="EvaluateImportCall" id="_ref_9"><a href="#sec-evaluate-import-call">EvaluateImportCall</a></emu-xref>(<emu-nt><a href="https://tc39.es/ecma262/#prod-AssignmentExpression">AssignmentExpression</a></emu-nt>, <emu-const>evaluation</emu-const>).</li></ol></emu-alg>
+
+        <emu-grammar><emu-production name="ImportCall" collapsed="">
+    <emu-nt><a href="#prod-ImportCall">ImportCall</a></emu-nt> <emu-geq>:</emu-geq> <emu-rhs a="squwtgf4" id="prod-E9lFAjcF">
+        <emu-t>import</emu-t>
+        <emu-t>.</emu-t>
+        <emu-t>source</emu-t>
+        <emu-t>(</emu-t>
+        <emu-nt params="+In, ?Yield, ?Await"><a href="https://tc39.es/ecma262/#prod-AssignmentExpression">AssignmentExpression</a><emu-mods><emu-params>[+In, ?Yield, ?Await]</emu-params></emu-mods></emu-nt>
+        <emu-t>)</emu-t>
+    </emu-rhs>
+</emu-production>
+</emu-grammar>
+        <emu-alg><ol><li>Return ?&nbsp;<emu-xref aoid="EvaluateImportCall" id="_ref_10"><a href="#sec-evaluate-import-call">EvaluateImportCall</a></emu-xref>(<emu-nt><a href="https://tc39.es/ecma262/#prod-AssignmentExpression">AssignmentExpression</a></emu-nt>, <emu-const>source</emu-const>).</li></ol></emu-alg>
+      </emu-clause>
+
+      <emu-clause id="sec-evaluate-import-call" type="abstract operation" aoid="EvaluateImportCall">
+        <h1><span class="secnum">13.3.10.2</span> EvaluateImportCall ( <var>specifierExpression</var>, <var>phase</var> )</h1>
+        <p>The abstract operation EvaluateImportCall takes arguments <var>specifierExpression</var> (a <emu-xref href="#sec-syntactic-grammar"><a href="https://tc39.es/ecma262/#sec-syntactic-grammar">Parse Node</a></emu-xref>) and <var>phase</var> (<emu-const>source</emu-const> or <emu-const>evaluation</emu-const>) and returns either a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">normal completion containing</a></emu-xref> a Promise or a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">throw completion</a></emu-xref>. It performs the following steps when called:</p>
+        <emu-alg><ol><li>Let <var>referrer</var> be <emu-xref aoid="GetActiveScriptOrModule"><a href="https://tc39.es/ecma262/#sec-getactivescriptormodule">GetActiveScriptOrModule</a></emu-xref>().</li><li>If <var>referrer</var> is <emu-val>null</emu-val>, set <var>referrer</var> to <emu-xref href="#current-realm"><a href="https://tc39.es/ecma262/#current-realm">the current Realm Record</a></emu-xref>.</li><li>Let <var>specifierRef</var> be ?&nbsp;<emu-xref aoid="Evaluation"><a href="https://tc39.es/ecma262/#sec-evaluation">Evaluation</a></emu-xref> of evaluating <var>specifierExpression</var>.</li><li>Let <var>specifier</var> be ?&nbsp;<emu-xref aoid="GetValue"><a href="https://tc39.es/ecma262/#sec-getvalue">GetValue</a></emu-xref>(<var>specifierRef</var>).</li><li>Let <var>promiseCapability</var> be !&nbsp;<emu-xref aoid="NewPromiseCapability"><a href="https://tc39.es/ecma262/#sec-newpromisecapability">NewPromiseCapability</a></emu-xref>(<emu-xref href="#sec-promise-constructor"><a href="https://tc39.es/ecma262/#sec-promise-constructor">%Promise%</a></emu-xref>).</li><li><ins>Let <var>isModuleSource</var> be ?&nbsp;<emu-xref aoid="OrdinaryHasInstance"><a href="https://tc39.es/ecma262/#sec-ordinaryhasinstance">OrdinaryHasInstance</a></emu-xref>(%AbstractModuleSource%, <var>specifier</var>).</ins></li><li><ins>If <var>isModuleSource</var> is <emu-val>true</emu-val>, then</ins><ol><li><ins>Let <var>module</var> be ?&nbsp;<emu-xref aoid="HostGetModuleSourceRecord" id="_ref_11"><a href="#sec-HostGetModuleSourceRecord">HostGetModuleSourceRecord</a></emu-xref>(<var>specifier</var>).</ins></li><li><ins>If <var>module</var>.<var class="field">[[Realm]]</var> is not equal to current <emu-xref href="#realm-record"><a href="https://tc39.es/ecma262/#realm-record">Realm Record</a></emu-xref>, throw a <emu-val>TypeError</emu-val> exception.</ins></li><li><ins>Perform <emu-xref aoid="ContinueDynamicImport" id="_ref_12"><a href="#sec-ContinueDynamicImport">ContinueDynamicImport</a></emu-xref>(<var>promiseCapability</var>, <var>phase</var>, <emu-xref aoid="Completion"><a href="https://tc39.es/ecma262/#sec-completion-ao">Completion</a></emu-xref>(<var>module</var>)).</ins></li><li><ins>Return <var>promiseCapability</var>.<var class="field">[[Promise]]</var>.</ins></li></ol></li><li>Let <var>specifierString</var> be <emu-xref aoid="Completion"><a href="https://tc39.es/ecma262/#sec-completion-ao">Completion</a></emu-xref>(<emu-xref aoid="ToString"><a href="https://tc39.es/ecma262/#sec-tostring">ToString</a></emu-xref>(<var>specifier</var>)).</li><li><emu-xref aoid="IfAbruptRejectPromise"><a href="https://tc39.es/ecma262/#sec-ifabruptrejectpromise">IfAbruptRejectPromise</a></emu-xref>(<var>specifierString</var>, <var>promiseCapability</var>).</li><li>Let <var>moduleRequest</var> be a new ModuleRequest <emu-xref href="#sec-list-and-record-specification-type"><a href="https://tc39.es/ecma262/#sec-list-and-record-specification-type">Record</a></emu-xref> { <var class="field">[[Specifier]]</var>: <var>specifierString</var>, <var class="field">[[Phase]]</var>: <var>phase</var>&nbsp;}.</li><li>Perform <emu-xref aoid="HostLoadImportedModule"><a href="https://tc39.es/ecma262/#sec-HostLoadImportedModule">HostLoadImportedModule</a></emu-xref>(<var>referrer</var>, <var>moduleRequest</var>, <emu-const>empty</emu-const>, <var>promiseCapability</var>).</li><li>Return <var>promiseCapability</var>.<var class="field">[[Promise]]</var>.</li></ol></emu-alg>
+        </emu-clause>
+      </emu-clause>
+
+      <emu-clause id="sec-ContinueDynamicImport" type="abstract operation" aoid="ContinueDynamicImport">
+        <h1><span class="secnum">13.3.11</span> ContinueDynamicImport ( <var>promiseCapability</var>, <ins><var>phase</var></ins>, <var>moduleCompletion</var> )</h1>
+        <p>The abstract operation ContinueDynamicImport takes arguments <var>promiseCapability</var> (a <emu-xref href="#sec-promisecapability-records"><a href="https://tc39.es/ecma262/#sec-promisecapability-records">PromiseCapability Record</a></emu-xref>), <ins><var>phase</var> (<emu-const>source</emu-const> or <emu-const>evaluation</emu-const>)</ins>, and <var>moduleCompletion</var> (either a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">normal completion containing</a></emu-xref> a <emu-xref href="#sec-abstract-module-records" id="_ref_13"><a href="#sec-abstract-module-records">Module Record</a></emu-xref> or a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">throw completion</a></emu-xref>) and returns <emu-const>unused</emu-const>. It completes the process of a dynamic import originally started by an <emu-xref href="#sec-import-calls" id="_ref_3"><a href="#sec-import-calls"><code>import()</code></a></emu-xref> call, resolving or rejecting the promise returned by that call as appropriate. It performs the following steps when called:</p>
+        <emu-alg><ol><li>If <var>moduleCompletion</var> is an <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">abrupt completion</a></emu-xref>, then<ol><li>Perform !&nbsp;<emu-xref aoid="Call"><a href="https://tc39.es/ecma262/#sec-call">Call</a></emu-xref>(<var>promiseCapability</var>.<var class="field">[[Reject]]</var>, <emu-val>undefined</emu-val>, « <var>moduleCompletion</var>.<var class="field">[[Value]]</var> »).</li><li>Return <emu-const>unused</emu-const>.</li></ol></li><li>Let <var>module</var> be <var>moduleCompletion</var>.<var class="field">[[Value]]</var>.</li><li><ins>If <var>phase</var> is <emu-const>source</emu-const>, then</ins><ol><li><ins>Let <var>moduleSourceCompletion</var> be <emu-xref aoid="Completion"><a href="https://tc39.es/ecma262/#sec-completion-ao">Completion</a></emu-xref>(<var>module</var>.GetModuleSource()).</ins></li><li><ins>If <var>moduleSourceCompletion</var> is an <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">abrupt completion</a></emu-xref>, then</ins><ol><li><ins>Perform !&nbsp;<emu-xref aoid="Call"><a href="https://tc39.es/ecma262/#sec-call">Call</a></emu-xref>(<var>promiseCapability</var>.<var class="field">[[Reject]]</var>, <emu-val>undefined</emu-val>, « <var>moduleSourceCompletion</var>.<var class="field">[[Value]]</var> »).</ins></li></ol></li><li><ins>Else,</ins><ol><li><ins>Perform !&nbsp;<emu-xref aoid="Call"><a href="https://tc39.es/ecma262/#sec-call">Call</a></emu-xref>(<var>promiseCapability</var>.<var class="field">[[Resolve]]</var>, <emu-val>undefined</emu-val>, « <var>moduleSourceCompletion</var>.<var class="field">[[Value]]</var> »).</ins></li></ol></li><li><ins>Return <emu-const>unused</emu-const>.</ins></li></ol></li><li>Let <var>loadPromise</var> be <var>module</var>.LoadRequestedModules().</li><li>Let <var>rejectedClosure</var> be a new <emu-xref href="#sec-abstract-closure"><a href="https://tc39.es/ecma262/#sec-abstract-closure">Abstract Closure</a></emu-xref> with parameters (<var>reason</var>) that captures <var>promiseCapability</var> and performs the following steps when called:<ol><li>Perform !&nbsp;<emu-xref aoid="Call"><a href="https://tc39.es/ecma262/#sec-call">Call</a></emu-xref>(<var>promiseCapability</var>.<var class="field">[[Reject]]</var>, <emu-val>undefined</emu-val>, « <var>reason</var> »).</li><li>Return <emu-const>unused</emu-const>.</li></ol></li><li>Let <var>onRejected</var> be <emu-xref aoid="CreateBuiltinFunction"><a href="https://tc39.es/ecma262/#sec-createbuiltinfunction">CreateBuiltinFunction</a></emu-xref>(<var>rejectedClosure</var>, 1, <emu-val>""</emu-val>, « »).</li><li>Let <var>linkAndEvaluateClosure</var> be a new <emu-xref href="#sec-abstract-closure"><a href="https://tc39.es/ecma262/#sec-abstract-closure">Abstract Closure</a></emu-xref> with no parameters that captures <var>module</var>, <var>promiseCapability</var>, and <var>onRejected</var> and performs the following steps when called:<ol><li>Let <var>link</var> be <emu-xref aoid="Completion"><a href="https://tc39.es/ecma262/#sec-completion-ao">Completion</a></emu-xref>(<var>module</var>.Link()).</li><li>If <var>link</var> is an <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">abrupt completion</a></emu-xref>, then<ol><li>Perform !&nbsp;<emu-xref aoid="Call"><a href="https://tc39.es/ecma262/#sec-call">Call</a></emu-xref>(<var>promiseCapability</var>.<var class="field">[[Reject]]</var>, <emu-val>undefined</emu-val>, « <var>link</var>.<var class="field">[[Value]]</var> »).</li><li>Return <emu-const>unused</emu-const>.</li></ol></li><li>Let <var>evaluatePromise</var> be <var>module</var>.Evaluate().</li><li>Let <var>fulfilledClosure</var> be a new <emu-xref href="#sec-abstract-closure"><a href="https://tc39.es/ecma262/#sec-abstract-closure">Abstract Closure</a></emu-xref> with no parameters that captures <var>module</var> and <var>promiseCapability</var> and performs the following steps when called:<ol><li>Let <var>namespace</var> be <emu-xref aoid="GetModuleNamespace"><a href="https://tc39.es/ecma262/#sec-getmodulenamespace">GetModuleNamespace</a></emu-xref>(<var>module</var>).</li><li>Perform !&nbsp;<emu-xref aoid="Call"><a href="https://tc39.es/ecma262/#sec-call">Call</a></emu-xref>(<var>promiseCapability</var>.<var class="field">[[Resolve]]</var>, <emu-val>undefined</emu-val>, « <var>namespace</var> »).</li><li>Return <emu-const>unused</emu-const>.</li></ol></li><li>Let <var>onFulfilled</var> be <emu-xref aoid="CreateBuiltinFunction"><a href="https://tc39.es/ecma262/#sec-createbuiltinfunction">CreateBuiltinFunction</a></emu-xref>(<var>fulfilledClosure</var>, <emu-val>""</emu-val>, 0, « »).</li><li>Perform <emu-xref aoid="PerformPromiseThen"><a href="https://tc39.es/ecma262/#sec-performpromisethen">PerformPromiseThen</a></emu-xref>(<var>evaluatePromise</var>, <var>onFulfilled</var>, <var>onRejected</var>).</li></ol></li><li>Let <var>linkAndEvaluate</var> be <emu-xref aoid="CreateBuiltinFunction"><a href="https://tc39.es/ecma262/#sec-createbuiltinfunction">CreateBuiltinFunction</a></emu-xref>(<var>linkAndEvaluateClosure</var>, <emu-val>""</emu-val>, 0, « »).</li><li>Perform <emu-xref aoid="PerformPromiseThen"><a href="https://tc39.es/ecma262/#sec-performpromisethen">PerformPromiseThen</a></emu-xref>(<var>loadPromise</var>, <var>linkAndEvaluate</var>, <var>onRejected</var>).</li><li>Return <emu-const>unused</emu-const>.</li></ol></emu-alg>
+      </emu-clause>
+    </emu-clause>
+  </emu-clause>
+
+
+<emu-clause id="sec-ecmascript-language-scripts-and-modules" number="16">
+  <h1><span class="secnum">16</span> ECMAScript Language: Scripts and Modules</h1>
+
+  <emu-clause id="sec-modules">
+    <h1><span class="secnum">16.1</span> Modules</h1>
+
+    <emu-clause id="sec-module-semantics">
+      <h1><span class="secnum">16.1.1</span> Module Semantics</h1>
+
+      <emu-clause id="sec-abstract-module-records">
+        <h1><span class="secnum">16.1.1.1</span> Abstract Module Records</h1>
+        <p>A <dfn variants="Module Records">Module Record</dfn> encapsulates structural information about the imports and exports of a single module. This information is used to link the imports and exports of sets of connected modules. A Module Record includes four fields that are only used when evaluating a module.</p>
+        <p>For specification purposes Module Record values are values of the <emu-xref href="#sec-list-and-record-specification-type"><a href="https://tc39.es/ecma262/#sec-list-and-record-specification-type">Record</a></emu-xref> specification type and can be thought of as existing in a simple object-oriented hierarchy where Module Record is an abstract class with both abstract and concrete subclasses. This specification defines the abstract subclass named <emu-xref href="#cyclic-module-record" id="_ref_14"><a href="#cyclic-module-record">Cyclic Module Record</a></emu-xref> and its concrete subclass named <emu-xref href="#sourctextmodule-record"><a href="https://tc39.es/ecma262/#sourctextmodule-record">Source Text Module Record</a></emu-xref>. Other specifications and implementations may define additional Module Record subclasses corresponding to alternative module definition facilities that they defined.</p>
+        <p>Module Record defines the fields listed in <emu-xref href="#table-module-record-fields" id="_ref_4"><a href="#table-module-record-fields">Table 2</a></emu-xref>. All Module Definition subclasses include at least those fields. Module Record also defines the abstract method list in <emu-xref href="#table-abstract-methods-of-module-records" id="_ref_5"><a href="#table-abstract-methods-of-module-records">Table 3</a></emu-xref>. All Module definition subclasses must provide concrete implementations of these abstract methods.</p>
+        <emu-table id="table-module-record-fields" caption="Module Record Fields" oldids="table-36"><figure><figcaption>Table 2: <emu-xref href="#sec-abstract-module-records" id="_ref_15"><a href="#sec-abstract-module-records">Module Record</a></emu-xref> Fields</figcaption><span id="table-36"></span>
+          <table>
+            <thead>
+              <tr>
+                <th>
+                  Field Name
+                </th>
+                <th>
+                  Value Type
+                </th>
+                <th>
+                  Meaning
+                </th>
+              </tr>
+            </thead>
+            <tbody><tr>
+              <td>
+                <var class="field">[[Realm]]</var>
+              </td>
+              <td>
+                a <emu-xref href="#realm-record"><a href="https://tc39.es/ecma262/#realm-record">Realm Record</a></emu-xref>
+              </td>
+              <td>
+                The <emu-xref href="#realm"><a href="https://tc39.es/ecma262/#realm">Realm</a></emu-xref> within which this module was created.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <var class="field">[[Environment]]</var>
+              </td>
+              <td>
+                a <emu-xref href="#sec-module-environment-records"><a href="https://tc39.es/ecma262/#sec-module-environment-records">Module Environment Record</a></emu-xref> or <emu-const>empty</emu-const>
+              </td>
+              <td>
+                The <emu-xref href="#sec-environment-records"><a href="https://tc39.es/ecma262/#sec-environment-records">Environment Record</a></emu-xref> containing the top level bindings for this module. This field is set when the module is linked.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <var class="field">[[Namespace]]</var>
+              </td>
+              <td>
+                an Object or <emu-const>empty</emu-const>
+              </td>
+              <td>
+                The Module Namespace Object (<emu-xref href="#sec-module-namespace-objects"><a href="https://tc39.es/ecma262/#sec-module-namespace-objects">28.3</a></emu-xref>) if one has been created for this module.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <var class="field">[[HostDefined]]</var>
+              </td>
+              <td>
+                anything (default value is <emu-val>undefined</emu-val>)
+              </td>
+              <td>
+                Field reserved for use by <emu-xref href="#host-environment"><a href="https://tc39.es/ecma262/#host-environment">host environments</a></emu-xref> that need to associate additional information with a module.
+              </td>
+            </tr>
+          </tbody></table>
+        </figure></emu-table>
+        <emu-table id="table-abstract-methods-of-module-records" caption="Abstract Methods of Module Records" oldids="table-37"><figure><figcaption>Table 3: Abstract Methods of <emu-xref href="#sec-abstract-module-records" id="_ref_16"><a href="#sec-abstract-module-records">Module Records</a></emu-xref></figcaption><span id="table-37"></span>
+          <table>
+            <tbody><tr>
+              <th>
+                Method
+              </th>
+              <th>
+                Purpose
+              </th>
+            </tr>
+            <tr>
+              <td>
+                LoadRequestedModules( [ <var>hostDefined</var> ] )
+              </td>
+              <td>
+                <p>Prepares the module for linking by recursively loading all its dependencies, and returns a promise.</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                GetExportedNames([<var>exportStarSet</var>])
+              </td>
+              <td>
+                <p>Return a list of all names that are either directly or indirectly exported from this module.</p>
+                <p>LoadRequestedModules must have completed successfully prior to invoking this method.</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                ResolveExport(<var>exportName</var> [, <var>resolveSet</var>])
+              </td>
+              <td>
+                <p>Return the binding of a name exported by this module. Bindings are represented by a <dfn id="resolvedbinding-record" variants="ResolvedBinding Records">ResolvedBinding Record</dfn>, of the form { <var class="field">[[Module]]</var>: <emu-xref href="#sec-abstract-module-records" id="_ref_17"><a href="#sec-abstract-module-records">Module Record</a></emu-xref>, <var class="field">[[BindingName]]</var>: String | <emu-const>namespace</emu-const> }. If the export is a Module Namespace Object without a direct binding in any module, <var class="field">[[BindingName]]</var> will be set to <emu-const>namespace</emu-const>. Return <emu-val>null</emu-val> if the name cannot be resolved, or <emu-const>ambiguous</emu-const> if multiple bindings were found.</p>
+                <p>Each time this operation is called with a specific <var>exportName</var>, <var>resolveSet</var> pair as arguments it must return the same result.</p>
+                <p>LoadRequestedModules must have completed successfully prior to invoking this method.</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                Link()
+              </td>
+              <td>
+                <p>Prepare the module for evaluation by transitively resolving all module dependencies and creating a <emu-xref href="#sec-module-environment-records"><a href="https://tc39.es/ecma262/#sec-module-environment-records">Module Environment Record</a></emu-xref>.</p>
+                <p>LoadRequestedModules must have completed successfully prior to invoking this method.</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                Evaluate()
+              </td>
+              <td>
+                <p>Returns a promise for the evaluation of this module and its dependencies, resolving on successful evaluation or if it has already been evaluated successfully, and rejecting for an evaluation error or if it has already been evaluated unsuccessfully. If the promise is rejected, <emu-xref href="#host"><a href="https://tc39.es/ecma262/#host">hosts</a></emu-xref> are expected to handle the promise rejection and rethrow the evaluation error.</p>
+                <p>Link must have completed successfully prior to invoking this method.</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                GetModuleSource()
+              </td>
+              <td>
+                <p>It returns either a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">normal completion containing</a></emu-xref> the <emu-xref href="#sec-module-source-objects" id="_ref_18"><a href="#sec-module-source-objects">Module Source Object</a></emu-xref> corresponding to this source <emu-xref href="#sec-abstract-module-records" id="_ref_19"><a href="#sec-abstract-module-records">Module Record</a></emu-xref>'s source phase (<emu-xref href="#sec-module-source-objects" id="_ref_6"><a href="#sec-module-source-objects">28.1</a></emu-xref>), or a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">throw completion</a></emu-xref>.</p>
+                <p>When called multiple times on the same <emu-xref href="#sec-abstract-module-records" id="_ref_20"><a href="#sec-abstract-module-records">Module Record</a></emu-xref>, if GetModuleSource() returns a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">normal completion</a></emu-xref> it must always return a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">normal completion containing</a></emu-xref> the same object.</p>
+                <p>The returned object should have a <var class="field">[[Prototype]]</var> internal slot whose value is <emu-xref href="#sec-properties-of-the-%abstractmodulesource%-prototype-object" id="_ref_21"><a href="#sec-properties-of-the-%abstractmodulesource%-prototype-object">%AbstractModuleSource.prototype%</a></emu-xref>.</p>
+                <p>For <emu-xref href="#sec-abstract-module-records" id="_ref_22"><a href="#sec-abstract-module-records">Module Records</a></emu-xref> that do not have a source representation, GetModuleSource() must always return a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">throw completion</a></emu-xref> whose <var class="field">[[Value]]</var> is a <emu-val>ReferenceError</emu-val>.</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <ins>GetModuleSourceName()</ins>
+              </td>
+              <td>
+                <p><ins>For <emu-xref href="#sec-abstract-module-records" id="_ref_23"><a href="#sec-abstract-module-records">Module Records</a></emu-xref> that implement a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">normal completion</a></emu-xref> for GetModuleSource(), returns a constant String for each concrete module record that exposes a source representation through <code>GetModuleSource()</code>, to be provided in the strongly branded return value of the <emu-xref href="#sec-well-known-symbols"><a href="https://tc39.es/ecma262/#sec-well-known-symbols">@@toStringTag</a></emu-xref> getter on %AbstractModuleSource%.</ins></p>
+                <p><ins>For <emu-xref href="#sec-abstract-module-records" id="_ref_24"><a href="#sec-abstract-module-records">Module Records</a></emu-xref> that do not have a source representation, GetModuleSourceName() is never called.</ins></p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <ins>ListImports()</ins>
+              </td>
+              <td>
+                <p><ins>For <emu-xref href="#sec-abstract-module-records" id="_ref_25"><a href="#sec-abstract-module-records">Module Records</a></emu-xref> that have a source representation, returns an Array representation for the imports of the module record.</ins></p>
+                <p><ins>For <emu-xref href="#sec-abstract-module-records" id="_ref_26"><a href="#sec-abstract-module-records">Module Records</a></emu-xref> that do not have a source representation, ListImports() is never called.</ins></p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <ins>ListExports()</ins>
+              </td>
+              <td>
+                <p><ins>For <emu-xref href="#sec-abstract-module-records" id="_ref_27"><a href="#sec-abstract-module-records">Module Records</a></emu-xref> that have a source representation, returns an Array representation for the exports of the module record.</ins></p>
+                <p><ins>For <emu-xref href="#sec-abstract-module-records" id="_ref_28"><a href="#sec-abstract-module-records">Module Records</a></emu-xref> that do not have a source representation, ListExports() is never called.</ins></p>
+              </td>
+            </tr>
+          </tbody></table>
+        </figure></emu-table>
+      </emu-clause>
+
+      <emu-clause id="sec-cyclic-module-records">
+        <h1><span class="secnum">16.1.1.2</span> Cyclic Module Records</h1>
+
+        <p>A <dfn id="cyclic-module-record" variants="Cyclic Module Records">Cyclic Module Record</dfn> is used to represent information about a module that can participate in dependency cycles with other modules that are subclasses of the <emu-xref href="#cyclic-module-record" id="_ref_29"><a href="#cyclic-module-record">Cyclic Module Record</a></emu-xref> type. <emu-xref href="#sec-abstract-module-records" id="_ref_30"><a href="#sec-abstract-module-records">Module Records</a></emu-xref> that are not subclasses of the <emu-xref href="#cyclic-module-record" id="_ref_31"><a href="#cyclic-module-record">Cyclic Module Record</a></emu-xref> type must not participate in dependency cycles with <emu-xref href="#sourctextmodule-record"><a href="https://tc39.es/ecma262/#sourctextmodule-record">Source Text Module Records</a></emu-xref>.</p>
+        <p>In addition to the fields defined in <emu-xref href="#table-module-record-fields" id="_ref_7"><a href="#table-module-record-fields">Table 2</a></emu-xref> <emu-xref href="#cyclic-module-record" id="_ref_32"><a href="#cyclic-module-record">Cyclic Module Records</a></emu-xref> have the additional fields listed in <emu-xref href="#table-cyclic-module-fields" id="_ref_8"><a href="#table-cyclic-module-fields">Table 4</a></emu-xref></p>
+        <emu-table id="table-cyclic-module-fields" caption="Additional Fields of Cyclic Module Records"><figure><figcaption>Table 4: Additional Fields of <emu-xref href="#cyclic-module-record" id="_ref_33"><a href="#cyclic-module-record">Cyclic Module Records</a></emu-xref></figcaption>
+          <table>
+            <tbody><tr>
+              <th>
+                Field Name
+              </th>
+              <th>
+                Value Type
+              </th>
+              <th>
+                Meaning
+              </th>
+            </tr>
+            <tr>
+              <td>
+                <var class="field">[[Status]]</var>
+              </td>
+              <td>
+                <emu-const>unlinked</emu-const>, <emu-const>linking</emu-const>, <emu-const>linked</emu-const>, <emu-const>evaluating</emu-const>, <emu-const>evaluating-async</emu-const>, or <emu-const>evaluated</emu-const>
+              </td>
+              <td>
+                Initially <emu-const>unlinked</emu-const>. Transitions to <emu-const>linking</emu-const>, <emu-const>linked</emu-const>, <emu-const>evaluating</emu-const>, possibly <emu-const>evaluating-async</emu-const>, <emu-const>evaluated</emu-const> (in that order) as the module progresses throughout its lifecycle. <emu-const>evaluating-async</emu-const> indicates this module is queued to execute on completion of its asynchronous dependencies or it is a module whose <var class="field">[[HasTLA]]</var> field is <emu-val>true</emu-val> that has been executed and is pending top-level completion.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <var class="field">[[EvaluationError]]</var>
+              </td>
+              <td>
+                a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">throw completion</a></emu-xref> or <emu-const>empty</emu-const>
+              </td>
+              <td>
+                A <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">throw completion</a></emu-xref> representing the exception that occurred during evaluation. <emu-val>undefined</emu-val> if no exception occurred or if <var class="field">[[Status]]</var> is not <emu-const>evaluated</emu-const>.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <ins><var class="field">[[ModuleSource]]</var></ins>
+              </td>
+              <td>
+                <ins>an Object or <emu-const>empty</emu-const></ins>
+              </td>
+              <td>
+                <ins>If this module has generated a module source object through GetModuleSource(), then this will be that object.</ins>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <var class="field">[[DFSIndex]]</var>
+              </td>
+              <td>
+                an <emu-xref href="#integer"><a href="https://tc39.es/ecma262/#integer">integer</a></emu-xref> or <emu-const>empty</emu-const>
+              </td>
+              <td>
+                Auxiliary field used during Link and Evaluate only. If <var class="field">[[Status]]</var> is <emu-const>linking</emu-const> or <emu-const>evaluating</emu-const>, this non-negative number records the point at which the module was first visited during the depth-first traversal of the dependency graph.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <var class="field">[[DFSAncestorIndex]]</var>
+              </td>
+              <td>
+                an <emu-xref href="#integer"><a href="https://tc39.es/ecma262/#integer">integer</a></emu-xref> or <emu-const>empty</emu-const>
+              </td>
+              <td>
+                Auxiliary field used during Link and Evaluate only. If <var class="field">[[Status]]</var> is <emu-const>linking</emu-const> or <emu-const>evaluating</emu-const>, this is either the module's own <var class="field">[[DFSIndex]]</var> or that of an "earlier" module in the same strongly connected component.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <var class="field">[[RequestedModules]]</var>
+              </td>
+              <td>
+                a <emu-xref href="#sec-list-and-record-specification-type"><a href="https://tc39.es/ecma262/#sec-list-and-record-specification-type">List</a></emu-xref> of ModuleRequest <emu-xref href="#sec-list-and-record-specification-type"><a href="https://tc39.es/ecma262/#sec-list-and-record-specification-type">Records</a></emu-xref>
+              </td>
+              <td>
+                A <emu-xref href="#sec-list-and-record-specification-type"><a href="https://tc39.es/ecma262/#sec-list-and-record-specification-type">List</a></emu-xref> of all the <emu-nt><a href="https://tc39.es/ecma262/#prod-ModuleSpecifier">ModuleSpecifier</a></emu-nt> strings used by the module represented by this record to request the importation of a module, along with their associated phase (<emu-const>source</emu-const> or <emu-const>evaluation</emu-const>). The <emu-xref href="#sec-list-and-record-specification-type"><a href="https://tc39.es/ecma262/#sec-list-and-record-specification-type">List</a></emu-xref> is in source text occurrence order.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <var class="field">[[CycleRoot]]</var>
+              </td>
+              <td>
+                a <emu-xref href="#cyclic-module-record" id="_ref_34"><a href="#cyclic-module-record">Cyclic Module Record</a></emu-xref> or <emu-const>empty</emu-const>
+              </td>
+              <td>
+                The first visited module of the cycle, the root DFS ancestor of the strongly connected component. For a module not in a cycle this would be the module itself. Once Evaluate has completed, a module's <var class="field">[[DFSAncestorIndex]]</var> is equal to the <var class="field">[[DFSIndex]]</var> of its <var class="field">[[CycleRoot]]</var>.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <var class="field">[[HasTLA]]</var>
+              </td>
+              <td>
+                a Boolean
+              </td>
+              <td>
+                Whether this module is individually asynchronous (for example, if it's a <emu-xref href="#sourctextmodule-record"><a href="https://tc39.es/ecma262/#sourctextmodule-record">Source Text Module Record</a></emu-xref> containing a top-level await). Having an asynchronous dependency does not mean this field is <emu-val>true</emu-val>. This field must not change after the module is parsed.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <var class="field">[[AsyncEvaluation]]</var>
+              </td>
+              <td>
+                a Boolean
+              </td>
+              <td>
+                Whether this module is either itself asynchronous or has an asynchronous dependency. Note: The order in which this field is set is used to order queued executions, see <emu-xref href="#sec-async-module-execution-fulfilled"><a href="https://tc39.es/ecma262/#sec-async-module-execution-fulfilled">16.2.1.5.3.4</a></emu-xref>.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <var class="field">[[TopLevelCapability]]</var>
+              </td>
+              <td>
+                a <emu-xref href="#sec-promisecapability-records"><a href="https://tc39.es/ecma262/#sec-promisecapability-records">PromiseCapability Record</a></emu-xref> or <emu-const>empty</emu-const>
+              </td>
+              <td>
+                If this module is the <var class="field">[[CycleRoot]]</var> of some cycle, and Evaluate() was called on some module in that cycle, this field contains the <emu-xref href="#sec-promisecapability-records"><a href="https://tc39.es/ecma262/#sec-promisecapability-records">PromiseCapability Record</a></emu-xref> for that entire evaluation. It is used to settle the Promise object that is returned from the Evaluate() abstract method. This field will be <emu-const>empty</emu-const> for any dependencies of that module, unless a top-level Evaluate() has been initiated for some of those dependencies.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <var class="field">[[AsyncParentModules]]</var>
+              </td>
+              <td>
+                a <emu-xref href="#sec-list-and-record-specification-type"><a href="https://tc39.es/ecma262/#sec-list-and-record-specification-type">List</a></emu-xref> of <emu-xref href="#cyclic-module-record" id="_ref_35"><a href="#cyclic-module-record">Cyclic Module Records</a></emu-xref>
+              </td>
+              <td>
+                If this module or a dependency has <var class="field">[[HasTLA]]</var> <emu-val>true</emu-val>, and execution is in progress, this tracks the parent importers of this module for the top-level execution job. These parent modules will not start executing before this module has successfully completed execution.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <var class="field">[[PendingAsyncDependencies]]</var>
+              </td>
+              <td>
+                an <emu-xref href="#integer"><a href="https://tc39.es/ecma262/#integer">integer</a></emu-xref> or <emu-const>empty</emu-const>
+              </td>
+              <td>
+                If this module has any asynchronous dependencies, this tracks the number of asynchronous dependency modules remaining to execute for this module. A module with asynchronous dependencies will be executed when this field reaches 0 and there are no execution errors.
+              </td>
+            </tr>
+          </tbody></table>
+        </figure></emu-table>
+
+        <emu-clause id="sec-modulelistimports" type="concrete method">
+          <h1><span class="secnum">16.1.1.2.1</span> ListImports ( )</h1>
+          <p>The ListImports concrete method of a <emu-xref href="#cyclic-module-record" id="_ref_36"><a href="#cyclic-module-record">Cyclic Module Record</a></emu-xref> <var>module</var> takes no arguments and returns an Array. It performs the following steps when called:</p>
+
+          <emu-alg><ol><li>TODO.</li></ol></emu-alg>
+        </emu-clause>
+
+        <emu-clause id="sec-modulelistexports" type="concrete method">
+          <h1><span class="secnum">16.1.1.2.2</span> ListExports ( )</h1>
+          <p>The ListExports concrete method of a <emu-xref href="#cyclic-module-record" id="_ref_37"><a href="#cyclic-module-record">Cyclic Module Record</a></emu-xref> <var>module</var> takes no arguments and returns an Array. It performs the following steps when called:</p>
+
+          <emu-alg><ol><li>TODO.</li></ol></emu-alg>
+        </emu-clause>
+      </emu-clause>
+
+      <emu-clause id="sec-source-text-module-records">
+        <h1><span class="secnum">16.1.1.3</span> Source Text Module Records</h1>
+
+        <emu-clause id="sec-source-text-module-record-getmodulesource" type="concrete method">
+          <h1><span class="secnum">16.1.1.3.1</span> GetModuleSource ( )</h1>
+          <p>The GetModuleSource concrete method of a <emu-xref href="#sourctextmodule-record"><a href="https://tc39.es/ecma262/#sourctextmodule-record">Source Text Module Record</a></emu-xref> <var>module</var> takes no arguments and returns either a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">normal completion containing</a></emu-xref> an Object or a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">throw completion</a></emu-xref>. It performs the following steps when called:</p>
+          <emu-alg><ol><li><del>Throw a <emu-val>ReferenceError</emu-val> exception.</del></li><li><ins>If <var>module</var>.<var class="field">[[ModuleSource]]</var> is not <emu-const>empty</emu-const>, then</ins><ol><li><ins>Return <var>module</var>.<var class="field">[[ModuleSource]]</var>.</ins></li></ol></li><li><ins>Let <var>moduleSource</var> be <emu-xref aoid="OrdinaryObjectCreate"><a href="https://tc39.es/ecma262/#sec-ordinaryobjectcreate">OrdinaryObjectCreate</a></emu-xref>(<emu-xref href="#sec-properties-of-the-%modulesource%-prototype-object" id="_ref_38"><a href="#sec-properties-of-the-%modulesource%-prototype-object">%ModuleSource.prototype%</a></emu-xref>).</ins></li><li><ins>Set <var>moduleSource</var>.<var class="field">[[SourceTextModuleRecord]]</var> to <var>module</var>.</ins></li><li><ins>Set <var>module</var>.<var class="field">[[ModuleSource]]</var> to <var>moduleSource</var>.</ins></li><li><ins>Return <var>moduleSource</var>.</ins></li></ol></emu-alg>
+        </emu-clause>
+      </emu-clause>
+
+      <emu-clause id="sec-HostGetModuleSourceName" type="host-defined abstract operation" aoid="HostGetModuleSourceName">
+        <h1><span class="secnum">16.1.1.4</span> <del>HostGetModuleSourceName ( <var>moduleSource</var> )</del></h1>
+        <p>The <emu-xref href="#host-defined"><a href="https://tc39.es/ecma262/#host-defined">host-defined</a></emu-xref> abstract operation HostGetModuleSourceName takes argument <var>moduleSource</var> (an Object) and returns either a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">normal completion containing</a></emu-xref> a String or a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">throw completion</a></emu-xref>.</p>
+
+        <p>An implementation of HostGetModuleSourceName must conform to the following requirements:</p>
+        <ul>
+          <li>
+            For any object that is a <emu-xref href="#sec-module-source-objects" id="_ref_39"><a href="#sec-module-source-objects">Module Source Object</a></emu-xref>, returns a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">normal completion</a></emu-xref> for a String corresponding to the source record type to be used as the strongly branded return value of the <emu-xref href="#sec-well-known-symbols"><a href="https://tc39.es/ecma262/#sec-well-known-symbols">@@toStringTag</a></emu-xref> getter on %AbstractModuleSource%.
+          </li>
+          <li>
+            For any object which is not a <emu-xref href="#sec-module-source-objects" id="_ref_40"><a href="#sec-module-source-objects">Module Source Object</a></emu-xref><ins>, or was not originally obtained through GetModuleSource</ins>, returns a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">throw completion</a></emu-xref>.
+          </li>
+        </ul>
+      </emu-clause>
+
+      <emu-clause id="sec-HostGetModuleSourceRecord" type="host-defined abstract operation" aoid="HostGetModuleSourceRecord">
+        <h1><span class="secnum">16.1.1.5</span> <ins>HostGetModuleSourceRecord ( <var>moduleSource</var> )</ins></h1>
+        <p>The <emu-xref href="#host-defined"><a href="https://tc39.es/ecma262/#host-defined">host-defined</a></emu-xref> abstract operation HostGetModuleSourceRecord takes argument <var>moduleSource</var> (an Object) and returns either a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">normal completion containing</a></emu-xref> a <emu-xref href="#sec-abstract-module-records" id="_ref_41"><a href="#sec-abstract-module-records">Module Record</a></emu-xref> or a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">throw completion</a></emu-xref>.</p>
+
+        <p>An implementation of HostGetModuleSourceRecord must conform to the following requirements:</p>
+        <ul>
+          <li>
+            For any object that is an instance of a concrete implementation of Abstract Module Source, returns a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">normal completion</a></emu-xref> for a concrete <emu-xref href="#sec-abstract-module-records" id="_ref_42"><a href="#sec-abstract-module-records">Module Record</a></emu-xref> corresponding to the canonical module for this source.
+          </li>
+          <li>
+            For any ModuleSource Instance, this hook must always return the result of the <emu-xref aoid="GetModuleSourceSourceTextModuleRecord" id="_ref_43"><a href="#sec-getmodulesourcesourcetextmodulerecord">GetModuleSourceSourceTextModuleRecord</a></emu-xref>.
+          </li>
+          <li>
+            For any object which is not a <emu-xref href="#sec-module-source-objects" id="_ref_44"><a href="#sec-module-source-objects">Module Source Object</a></emu-xref>, or was not originally obtained through GetModuleSource, returns a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">throw completion</a></emu-xref>.
+          </li>
+        </ul>
+      </emu-clause>
+    </emu-clause>
+  </emu-clause>
+</emu-clause>
+
+<emu-clause id="sec-reflection" number="28">
+  <h1><span class="secnum">28</span> Reflection</h1>
+  <emu-clause id="sec-module-source-objects">
+    <h1><span class="secnum">28.1</span> Module Source Objects</h1>
+    <p>Module Source Objects represent modules in their source import phase, which are not linked, instantiated or executed.</p>
+    <p>A <dfn>Module Source Object</dfn> is an object for which <del><emu-xref aoid="HostGetModuleSourceName" id="_ref_45"><a href="#sec-HostGetModuleSourceName">HostGetModuleSourceName</a></emu-xref></del><ins><emu-xref aoid="HostGetModuleSourceRecord" id="_ref_46"><a href="#sec-HostGetModuleSourceRecord">HostGetModuleSourceRecord</a></emu-xref></ins> returns a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">normal completion</a></emu-xref>.</p>
+    <p>All Module Source Objects should have a prototype of %AbstractModuleSource%.prototype.</p>
+    <p><emu-xref href="#host"><a href="https://tc39.es/ecma262/#host">Hosts</a></emu-xref> may define their own %AbstractModuleSource% subclasses for custom module types.</p>
+
+    <emu-clause id="sec-%abstractmodulesource%-constructor">
+      <h1><span class="secnum">28.1.1</span> The %AbstractModuleSource% Constructor</h1>
+      <p>The %AbstractModuleSource% <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref>:</p>
+      <ul>
+        <li>along with its corresponding prototype object, provides common properties that are inherited by Module Source <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructors</a></emu-xref> and their instances.</li>
+        <li>does not have a global name or appear as a property of the <emu-xref href="#sec-global-object"><a href="https://tc39.es/ecma262/#sec-global-object">global object</a></emu-xref>.</li>
+        <li>acts as a common superclass of the <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructors</a></emu-xref> of Module Source Objects.</li>
+        <li>will throw an error when invoked, because it is an abstract class <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref>. The module source <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructors</a></emu-xref> do not perform a <code>super</code> call to it.</li>
+      </ul>
+
+      <emu-clause id="sec-%abstractmodulesource%">
+        <h1><span class="secnum">28.1.1.1</span> %AbstractModuleSource% ( )</h1>
+        <p>This function performs the following steps when called:</p>
+        <emu-alg><ol><li>Throw a <emu-val>TypeError</emu-val> exception.</li></ol></emu-alg>
+      </emu-clause>
+    </emu-clause>
+
+    <emu-clause id="sec-properties-of-the-%abstractmodulesource%-intrinsic-object">
+      <h1><span class="secnum">28.1.2</span> Properties of the %AbstractModuleSource% Intrinsic Object</h1>
+      <p>The %AbstractModuleSource% intrinsic object:</p>
+      <ul>
+        <li>has a <var class="field">[[Prototype]]</var> internal slot whose value is <emu-xref href="#sec-properties-of-the-function-prototype-object"><a href="https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object">%Function.prototype%</a></emu-xref>.</li>
+        <li>has a <emu-val>"name"</emu-val> property whose value is <emu-val>"AbstractModuleSource"</emu-val>.</li>
+        <li>has the following properties:</li>
+      </ul>
+
+      <emu-clause id="sec-%abstractmodulesource%.prototype">
+        <h1><span class="secnum">28.1.2.1</span> %AbstractModuleSource%.prototype</h1>
+        <p>The initial value of %AbstractModuleSource%<code>.prototype</code> is the <emu-xref href="#sec-properties-of-the-%abstractmodulesource%-prototype-object" id="_ref_47"><a href="#sec-properties-of-the-%abstractmodulesource%-prototype-object">%AbstractModuleSource% prototype object</a></emu-xref>.</p>
+        <p>This property has the attributes { <var class="field">[[Writable]]</var>: <emu-val>false</emu-val>, <var class="field">[[Enumerable]]</var>: <emu-val>false</emu-val>, <var class="field">[[Configurable]]</var>: <emu-val>false</emu-val> }.</p>
+      </emu-clause>
+    </emu-clause>
+
+    <emu-clause id="sec-properties-of-the-%abstractmodulesource%-prototype-object">
+      <h1><span class="secnum">28.1.3</span> Properties of the %AbstractModuleSource% Prototype Object</h1>
+      <p>The <dfn>%AbstractModuleSource% prototype object</dfn>:</p>
+      <ul>
+        <li>has a <var class="field">[[Prototype]]</var> internal slot whose value is <emu-xref href="#sec-properties-of-the-object-prototype-object"><a href="https://tc39.es/ecma262/#sec-properties-of-the-object-prototype-object">%Object.prototype%</a></emu-xref>.</li>
+        <li>is <dfn>%AbstractModuleSource.prototype%</dfn>.</li>
+        <li>is an <emu-xref href="#ordinary-object"><a href="https://tc39.es/ecma262/#ordinary-object">ordinary object</a></emu-xref>.</li>
+        <li>has the following properties:</li>
+      </ul>
+
+      <emu-clause id="sec-%abstractmodulesource%.prototype.constructor">
+        <h1><span class="secnum">28.1.3.1</span> %AbstractModuleSource%.prototype.constructor</h1>
+        <p>The initial value of %AbstractModuleSource%<code>.prototype.constructor</code> is %AbstractModuleSource%.</p>
+      </emu-clause>
+
+      <emu-clause id="sec-get-%abstractmodulesource%.prototype.@@tostringtag">
+        <h1><span class="secnum">28.1.3.2</span> get %AbstractModuleSource%.prototype [ @@toStringTag ]</h1>
+        <p>%AbstractModuleSource%.prototype <code>[@@toStringTag]</code> is an <emu-xref href="#sec-object-type" id="_ref_48"><a href="#sec-object-type">accessor property</a></emu-xref> whose set accessor function is <emu-val>undefined</emu-val>. Its get accessor function performs the following steps when called:</p>
+        <emu-alg><ol><li>Let <var>O</var> be the <emu-val>this</emu-val> value.</li><li>If <var>O</var> <emu-xref href="#sec-object-type" id="_ref_49"><a href="#sec-object-type">is not an Object</a></emu-xref>, return <emu-val>undefined</emu-val>.</li><li><del>Let <var>sourceNameResult</var> be <emu-xref aoid="Completion"><a href="https://tc39.es/ecma262/#sec-completion-ao">Completion</a></emu-xref>(<emu-xref aoid="HostGetModuleSourceName" id="_ref_50"><a href="#sec-HostGetModuleSourceName">HostGetModuleSourceName</a></emu-xref>(<var>O</var>)).</del></li><li><del>If <var>sourceNameResult</var> is an <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">abrupt completion</a></emu-xref>, return <emu-val>undefined</emu-val>.</del></li><li><del>Let <var>name</var> be !&nbsp;<var>sourceNameResult</var>.</del></li><li><ins>Let <var>moduleResult</var> be <emu-xref aoid="Completion"><a href="https://tc39.es/ecma262/#sec-completion-ao">Completion</a></emu-xref>(<emu-xref aoid="HostGetModuleSourceRecord" id="_ref_51"><a href="#sec-HostGetModuleSourceRecord">HostGetModuleSourceRecord</a></emu-xref>(<var>O</var>)).</ins></li><li><ins>If <var>moduleResult</var> is an <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">abrupt completion</a></emu-xref>, return <emu-val>undefined</emu-val>.</ins></li><li><ins>Let <var>module</var> be !&nbsp;<var>moduleResult</var>.</ins></li><li><ins>Let <var>name</var> be <var>module</var>.GetModuleSourceName().</ins></li><li><emu-xref href="#assert"><a href="https://tc39.es/ecma262/#assert">Assert</a></emu-xref>: <var>name</var> <emu-xref href="#sec-ecmascript-language-types-string-type"><a href="https://tc39.es/ecma262/#sec-ecmascript-language-types-string-type">is a String</a></emu-xref>.</li><li>Return <var>name</var>.</li></ol></emu-alg>
+        <p>This property has the attributes { <var class="field">[[Enumerable]]</var>: <emu-val>false</emu-val>, <var class="field">[[Configurable]]</var>: <emu-val>true</emu-val> }.</p>
+        <p>The initial value of the <emu-val>"name"</emu-val> property of this function is <emu-val>"get [Symbol.toStringTag]"</emu-val>.</p>
+      </emu-clause>
+
+      <emu-clause id="sec-%abstractmodulesource%.prototype.imports">
+        <h1><span class="secnum">28.1.3.3</span> <ins>%AbstractModuleSource%.prototype.imports ( )</ins></h1>
+        <p>This method performs the following steps when called:</p>
+        <emu-alg><ol><li>Let <var>M</var> be the <emu-val>this</emu-val> value.</li><li>Let <var>module</var> be ?&nbsp;<emu-xref aoid="HostGetModuleSourceRecord" id="_ref_52"><a href="#sec-HostGetModuleSourceRecord">HostGetModuleSourceRecord</a></emu-xref>(<var>M</var>).</li><li><emu-xref href="#assert"><a href="https://tc39.es/ecma262/#assert">Assert</a></emu-xref>: <var>module</var> is a <emu-xref href="#cyclic-module-record" id="_ref_53"><a href="#cyclic-module-record">Cyclic Module Record</a></emu-xref>.</li><li>Return <var>module</var>.ListImports().</li></ol></emu-alg>
+      </emu-clause>
+
+      <emu-clause id="sec-%abstractmodulesource%.prototype.exports">
+        <h1><span class="secnum">28.1.3.4</span> <ins>%AbstractModuleSource%.prototype.exports ( )</ins></h1>
+        <p>This method performs the following steps when called:</p>
+        <emu-alg><ol><li>Let <var>M</var> be the <emu-val>this</emu-val> value.</li><li>Let <var>module</var> be ?&nbsp;<emu-xref aoid="HostGetModuleSourceRecord" id="_ref_54"><a href="#sec-HostGetModuleSourceRecord">HostGetModuleSourceRecord</a></emu-xref>(<var>M</var>).</li><li><emu-xref href="#assert"><a href="https://tc39.es/ecma262/#assert">Assert</a></emu-xref>: <var>module</var> is a <emu-xref href="#cyclic-module-record" id="_ref_55"><a href="#cyclic-module-record">Cyclic Module Record</a></emu-xref>.</li><li>Return <var>module</var>.ListExports().</li></ol></emu-alg>
+      </emu-clause>
+    </emu-clause>
+
+    <emu-clause id="sec-module-source-object">
+      <h1><span class="secnum">28.1.4</span> <ins>The %ModuleSource% Constructor</ins></h1>
+      <p>The %ModuleSource% <emu-xref href="#constructor"><a href="https://tc39.es/ecma262/#constructor">constructor</a></emu-xref>:</p>
+      <ul>
+        <li>does not have a global name or appear as a property of the <emu-xref href="#sec-global-object"><a href="https://tc39.es/ecma262/#sec-global-object">global object</a></emu-xref>.</li>
+        <li>will throw an error when invoked, where support for dynamic construction may be added in future.</li>
+      </ul>
+
+      <emu-clause id="sec-%modulesource%">
+        <h1><span class="secnum">28.1.4.1</span> %ModuleSource% ( )</h1>
+        <p>This function performs the following steps when called:</p>
+        <emu-alg><ol><li>Throw a <emu-val>TypeError</emu-val> exception.</li></ol></emu-alg>
+      </emu-clause>
+    </emu-clause>
+
+    <emu-clause id="sec-properties-of-the-%modulesource%-prototype-object">
+      <h1><span class="secnum">28.1.5</span> <ins>Properties of the %ModuleSource% Prototype Object</ins></h1>
+      <p>The <dfn>%ModuleSource% prototype object</dfn>:</p>
+      <ul>
+        <li>has a <var class="field">[[Prototype]]</var> internal slot whose value is <emu-xref href="#sec-properties-of-the-%abstractmodulesource%-prototype-object" id="_ref_56"><a href="#sec-properties-of-the-%abstractmodulesource%-prototype-object">%AbstractModuleSource.prototype%</a></emu-xref>.</li>
+        <li>is <dfn>%ModuleSource.prototype%</dfn>.</li>
+        <li>is an <emu-xref href="#ordinary-object"><a href="https://tc39.es/ecma262/#ordinary-object">ordinary object</a></emu-xref>.</li>
+        <li>has the following properties:</li>
+      </ul>
+
+      <emu-clause id="sec-%modulesource%.prototype.constructor">
+        <h1><span class="secnum">28.1.5.1</span> <ins>%ModuleSource%.prototype.constructor</ins></h1>
+        <p>The initial value of %ModuleSource%<code>.prototype.constructor</code> is %ModuleSource%.</p>
+      </emu-clause>
+    </emu-clause>
+
+    <emu-clause id="sec-properties-of-modulesource-instances">
+      <h1><span class="secnum">28.1.6</span> <ins>Properties of ModuleSource Instances</ins></h1>
+      <p>ModuleSource instances are <emu-xref href="#ordinary-object"><a href="https://tc39.es/ecma262/#ordinary-object">ordinary objects</a></emu-xref> that inherit properties from the <emu-xref href="#sec-properties-of-the-%modulesource%-prototype-object" id="_ref_57"><a href="#sec-properties-of-the-%modulesource%-prototype-object">%ModuleSource% prototype object</a></emu-xref>.</p>
+      <p>ModuleSource instances have a <var class="field">[[SourceTextModuleRecord]]</var> internal slot.</p>
+    </emu-clause>
+
+    <emu-clause id="sec-abstract-operations-for-modulesource-objects">
+      <h1><span class="secnum">28.1.7</span> <ins>Abstract Operations for ModuleSource Objects</ins></h1>
+
+      <emu-clause id="sec-getmodulesourcesourcetextmodulerecord" type="abstract operation" aoid="GetModuleSourceSourceTextModuleRecord">
+        <h1><span class="secnum">28.1.7.1</span> GetModuleSourceSourceTextModuleRecord ( <var>M</var> )</h1>
+        <p>The abstract operation GetModuleSourceSourceTextModuleRecord takes argument <var>M</var> (a ModuleSource Instance) and returns either a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">normal completion containing</a></emu-xref> a <emu-xref href="#sourctextmodule-record"><a href="https://tc39.es/ecma262/#sourctextmodule-record">Source Text Module Record</a></emu-xref>, or a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">throw completion</a></emu-xref>. It performs the following steps when called:</p>
+        <emu-alg><ol><li>Perform ?&nbsp;<emu-xref aoid="RequireInternalSlot"><a href="https://tc39.es/ecma262/#sec-requireinternalslot">RequireInternalSlot</a></emu-xref>(<var>M</var>, <var class="field">[[SourceTextModuleRecord]]</var>).</li><li>Return <var>M</var>.<var class="field">[[SourceTextModuleRecord]]</var>.</li></ol></emu-alg>
+        <emu-note><span class="note">Note</span><div class="note-contents">
+          <p>This abstract operation is the required implementation of <emu-xref aoid="HostGetModuleSourceRecord" id="_ref_58"><a href="#sec-HostGetModuleSourceRecord">HostGetModuleSourceRecord</a></emu-xref> for any object which is a ModuleSource Instance.</p>
+        </div></emu-note>
+      </emu-clause>
+    </emu-clause>
+  </emu-clause>
+</emu-clause>
+
+<emu-annex id="sec-host-layering-points">
+  <h1><span class="secnum">A</span> Host Layering Points</h1>
+
+  <emu-annex id="sec-host-hooks-summary">
+    <h1><span class="secnum">A.1</span> Host Hooks</h1>
+    <p><b><emu-xref aoid="HostCallJobCallback"><a href="https://tc39.es/ecma262/#sec-hostcalljobcallback">HostCallJobCallback</a></emu-xref>(...)</b></p>
+    <p><b><emu-xref aoid="HostEnqueueFinalizationRegistryCleanupJob"><a href="https://tc39.es/ecma262/#sec-host-cleanup-finalization-registry">HostEnqueueFinalizationRegistryCleanupJob</a></emu-xref>(...)</b></p>
+    <p><b><emu-xref aoid="HostEnqueueGenericJob"><a href="https://tc39.es/ecma262/#sec-hostenqueuegenericjob">HostEnqueueGenericJob</a></emu-xref>(...)</b></p>
+    <p><b><emu-xref aoid="HostEnqueuePromiseJob"><a href="https://tc39.es/ecma262/#sec-hostenqueuepromisejob">HostEnqueuePromiseJob</a></emu-xref>(...)</b></p>
+    <p><b><emu-xref aoid="HostEnqueueTimeoutJob"><a href="https://tc39.es/ecma262/#sec-hostenqueuetimeoutjob">HostEnqueueTimeoutJob</a></emu-xref>(...)</b></p>
+    <p><b><emu-xref aoid="HostEnsureCanCompileStrings"><a href="https://tc39.es/ecma262/#sec-hostensurecancompilestrings">HostEnsureCanCompileStrings</a></emu-xref>(...)</b></p>
+    <p><b><emu-xref aoid="HostFinalizeImportMeta"><a href="https://tc39.es/ecma262/#sec-hostfinalizeimportmeta">HostFinalizeImportMeta</a></emu-xref>(...)</b></p>
+    <p><b><emu-xref aoid="HostGetImportMetaProperties"><a href="https://tc39.es/ecma262/#sec-hostgetimportmetaproperties">HostGetImportMetaProperties</a></emu-xref>(...)</b></p>
+    <p><b><del><emu-xref aoid="HostGetModuleSourceName" id="_ref_59"><a href="#sec-HostGetModuleSourceName">HostGetModuleSourceName</a></emu-xref></del><ins><emu-xref aoid="HostGetModuleSourceRecord" id="_ref_60"><a href="#sec-HostGetModuleSourceRecord">HostGetModuleSourceRecord</a></emu-xref></ins>(...)</b></p>
+    <p><b>HostGrowSharedArrayBuffer(...)</b></p>
+    <p><b><emu-xref aoid="HostHasSourceTextAvailable"><a href="https://tc39.es/ecma262/#sec-hosthassourcetextavailable">HostHasSourceTextAvailable</a></emu-xref>(...)</b></p>
+    <p><b><emu-xref aoid="HostLoadImportedModule"><a href="https://tc39.es/ecma262/#sec-HostLoadImportedModule">HostLoadImportedModule</a></emu-xref>(...)</b></p>
+    <p><b><emu-xref aoid="HostMakeJobCallback"><a href="https://tc39.es/ecma262/#sec-hostmakejobcallback">HostMakeJobCallback</a></emu-xref>(...)</b></p>
+    <p><b><emu-xref aoid="HostPromiseRejectionTracker"><a href="https://tc39.es/ecma262/#sec-host-promise-rejection-tracker">HostPromiseRejectionTracker</a></emu-xref>(...)</b></p>
+    <p><b>HostResizeArrayBuffer(...)</b></p>
+    <p><b><emu-xref aoid="InitializeHostDefinedRealm"><a href="https://tc39.es/ecma262/#sec-initializehostdefinedrealm">InitializeHostDefinedRealm</a></emu-xref>(...)</b></p>
+  </emu-annex>
+</emu-annex><emu-annex id="sec-copyright-and-software-license">
+      <h1><span class="secnum">B</span> Copyright &amp; Software License</h1>
+      
+      <h2>Copyright Notice</h2>
+      <p>© 2024 Luca Casonato, Guy Bedford</p>
+
+      <h2>Software License</h2>
+      <p>All Software contained in this document ("Software") is protected by copyright and is being made available under the "BSD License", included below. This Software may be subject to third party rights (rights from parties other than Ecma International), including patent rights, and no licenses under such third party rights are granted under this license even if the third party concerned is a member of Ecma International. SEE THE ECMA CODE OF CONDUCT IN PATENT MATTERS AVAILABLE AT <a href="https://ecma-international.org/memento/codeofconduct.htm">https://ecma-international.org/memento/codeofconduct.htm</a> FOR INFORMATION REGARDING THE LICENSING OF PATENT CLAIMS THAT ARE REQUIRED TO IMPLEMENT ECMA INTERNATIONAL STANDARDS.</p>
+
+<p>Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:</p>
+
+<ol>
+  <li>Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.</li>
+  <li>Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.</li>
+  <li>Neither the name of the authors nor Ecma International may be used to endorse or promote products derived from this software without specific prior written permission.</li>
+</ol>
+
+<p>THIS SOFTWARE IS PROVIDED BY THE ECMA INTERNATIONAL "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL ECMA INTERNATIONAL BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</p>
+
+    </emu-annex>
+</div></body>
