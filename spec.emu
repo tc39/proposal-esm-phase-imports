@@ -1066,20 +1066,11 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
-                <ins>ListImports()</ins>
+                <ins>GetImports()</ins>
               </td>
               <td>
                 <p><ins>For Module Records that have a source representation, returns an Array representation for the imports of the module record.</ins></p>
-                <p><ins>For Module Records that do not have a source representation, ListImports() is never called.</ins></p>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <ins>ListExports()</ins>
-              </td>
-              <td>
-                <p><ins>For Module Records that have a source representation, returns an Array representation for the exports of the module record.</ins></p>
-                <p><ins>For Module Records that do not have a source representation, ListExports() is never called.</ins></p>
+                <p><ins>For Module Records that do not have a source representation, GetImports() is never called.</ins></p>
               </td>
             </tr>
           </table>
@@ -1239,8 +1230,8 @@ contributors: Luca Casonato, Guy Bedford
           </table>
         </emu-table>
 
-        <emu-clause id="sec-modulelistimports" type="concrete method">
-          <h1>ListImports ( ): an Array</h1>
+        <emu-clause id="sec-modulegetmetadata" type="concrete method">
+          <h1><ins>GetMetadata ( ): an Object</ins></h1>
           <dl class="header">
             <dt>for</dt>
             <dd>a Cyclic Module Record _module_</dd>
@@ -1250,22 +1241,21 @@ contributors: Luca Casonato, Guy Bedford
           </dl>
 
           <emu-alg>
-            1. TODO.
-          </emu-alg>
-        </emu-clause>
-
-        <emu-clause id="sec-modulelistexports" type="concrete method">
-          <h1>ListExports ( ): an Array</h1>
-          <dl class="header">
-            <dt>for</dt>
-            <dd>a Cyclic Module Record _module_</dd>
-
-            <dt>description</dt>
-            <dd></dd>
-          </dl>
-
-          <emu-alg>
-            1. TODO.
+            1. Let _metadata_ be OrdinaryObjectCreate(*null*).
+            1. Let _imports_ be a new empty List.
+            1. For each ModuleRequest Record _request_ of _module_.[[RequestedModules]], do
+              1. Let _import_ be OrdinaryObjectCreate(*null*).
+              1. Perform ! CreateDataPropertyOrThrow(_import_, *"specifier"*, _request_.[[Specifier]]).
+              1. Let _phase_ be _request_.[[Phase]].
+              1. Let _maybePhaseString_ be *null*.
+              1. If _phase_ is ~source~, then
+                1. Set _maybePhaseString_ to *"source"*.
+              1. Perform ! CreateDataPropertyOrThrow(_import_, *"phase"*, _maybePhaseString_).
+              1. Append _import_ to _imports_.
+            1. Let _importsArray_ be CreateArrayFromList(_imports_).
+            1. Perform ! CreateDataPropertyOrThrow(_metadata_, *"imports"*, _importsArray_).
+            1. Perform ! CreateDataPropertyOrThrow(_metadata_, *"topLevelAwait"*, _module_.[[HasTLA]]).
+            1. Return _metadata_.
           </emu-alg>
         </emu-clause>
       </emu-clause>
@@ -1429,25 +1419,14 @@ contributors: Luca Casonato, Guy Bedford
         <p>The initial value of the *"name"* property of this function is *"get [Symbol.toStringTag]"*.</p>
       </emu-clause>
 
-      <emu-clause id="sec-%abstractmodulesource%.prototype.imports">
-        <h1><ins>%AbstractModuleSource%.prototype.imports ( )</ins></h1>
+      <emu-clause id="sec-%abstractmodulesource%.prototype.metadata">
+        <h1><ins>%AbstractModuleSource%.prototype.metadata ( )</ins></h1>
         <p>This method performs the following steps when called:</p>
         <emu-alg>
           1. Let _M_ be the *this* value.
           1. Let _module_ be ? HostGetModuleSourceRecord(_M_).
           1. Assert: _module_ is a Cyclic Module Record.
-          1. Return _module_.ListImports().
-        </emu-alg>
-      </emu-clause>
-
-      <emu-clause id="sec-%abstractmodulesource%.prototype.exports">
-        <h1><ins>%AbstractModuleSource%.prototype.exports ( )</ins></h1>
-        <p>This method performs the following steps when called:</p>
-        <emu-alg>
-          1. Let _M_ be the *this* value.
-          1. Let _module_ be ? HostGetModuleSourceRecord(_M_).
-          1. Assert: _module_ is a Cyclic Module Record.
-          1. Return _module_.ListExports().
+          1. Return _module_.GetMetadata().
         </emu-alg>
       </emu-clause>
     </emu-clause>

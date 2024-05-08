@@ -123,42 +123,27 @@ These helper methods are designed to allow for determining the static public exp
 imports of a module, but do not give information about the internal module identifiers or dynamic
 import.
 
-### `ModuleSource.prototype.imports()`
+### `ModuleSource.prototype.metadata()`
 
-Returns the ordered list of the dependencies `Import[]`, defined by:
+Returns metadata about the modular structure of the module:
+
+```ts
+interface ModuleMetadata {
+  imports: Import[],
+  topLevelAwait: bool,
+}
+```
+
+where `Import` is deifned by:
 
 ```ts
 interface Import {
   specifier: string,
-  attributes: null | {
-    [key: string]: string
-  },
   phase: null | 'source'
 }
 ```
 
-Note that all `export` statements with a `from` clause are reflected as imports as well as
-being reflected on exports.
-
-### `ModuleSource.prototype.exports()`
-
-Returns the list of public exports `(Export | StarReexport)[]`, defined by:
-
-```ts
-interface Export {
-  type: 'export',
-  name: string,
-}
-
-interface StarReexport {
-  type: 'star-reexport',
-  from: Import
-}
-```
-
-`Export` is provided for both re-exports and local exports. For example,
-`export * as X from './x.js'` would be reflected as the export `{ type: 'export', name: 'x' }`,
-and then also appear in the `Import` dependency list separately.
+`topLevelAwait` is *true* if and only if there is usage of top-level await in the module.
 
 ### Dynamic Import
 
