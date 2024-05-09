@@ -123,20 +123,9 @@ These helper methods are designed to allow for determining the static public exp
 imports of a module, but do not give information about the internal module identifiers or dynamic
 import.
 
-### `ModuleSource.prototype.metadata()`
+### `AbstractModuleSource.prototype.imports()`
 
-Returns metadata about the modular structure of the module:
-
-```ts
-interface ModuleMetadata {
-  imports: Import[],
-  hasDynamicImport: bool,
-  hasImportMeta: bool,
-  hasTopLevelAwait: bool,
-}
-```
-
-where `Import` is deifned by:
+Returns a list of the imports of the module of the form `Import[]` defined by:
 
 ```ts
 interface Import {
@@ -145,10 +134,17 @@ interface Import {
 }
 ```
 
-* `hasDynamicImport` is *true* if and only if there is usage of dynamic import.
-* `hasImportMeta` is *true* if and only if there is usage of import meta.
-* `hasTopLevelAwait` is *true* if and only if there is usage of top-level await in the module.
+### `AbstractModuleSource.prototype.hasDynamicImport`
 
+A boolean property indicating if the module may call dynamic import.
+
+### `AbstractModuleSource.prototype.hasImportMeta`
+
+A boolean property indicating if the module accesses the module `import.meta`.
+
+### `AbstractModuleSource.prototype.hasTopLevelAwait`
+
+A boolean property indicating if the module contains use of top-level await.
 
 ### Dynamic Import
 

@@ -849,12 +849,13 @@ contributors: Luca Casonato, Guy Bedford
           1. Let _specifierRef_ be ? Evaluation of evaluating _specifierExpression_.
           1. Let _specifier_ be ? GetValue(_specifierRef_).
           1. Let _promiseCapability_ be ! NewPromiseCapability(%Promise%).
-          1. <ins>Let _isModuleSource_ be ? OrdinaryHasInstance(%AbstractModuleSource%, _specifier_).</ins>
-          1. <ins>If _isModuleSource_ is *true*, then</ins>
-            1. <ins>Let _module_ be ? HostGetModuleSourceRecord(_specifier_).</ins>
-            1. <ins>If _module_.[[Realm]] is not equal to current Realm Record, throw a *TypeError* exception.</ins>
-            1. <ins>Perform ContinueDynamicImport(_promiseCapability_, _phase_, Completion(_module_)).</ins>
-            1. <ins>Return _promiseCapability_.[[Promise]].</ins>
+          1. <ins>If _specifier_ is an Object, then</ins>
+            1. <ins>Let _module_ be Completion(HostGetModuleSourceRecord(_specifier_)).</ins>
+            1. <ins>IfAbruptRejectPromise(_module_, _promiseCapability_).</ins>
+            1. <ins>If _module_ is not ~unused~, then</ins>
+              1. <ins>If _module_.[[Realm]] is not equal to current Realm Record, throw a *TypeError* exception.</ins>
+              1. <ins>Perform ContinueDynamicImport(_promiseCapability_, _phase_, Completion(_module_)).</ins>
+              1. <ins>Return _promiseCapability_.[[Promise]].</ins>
           1. Let _specifierString_ be Completion(ToString(_specifier_)).
           1. IfAbruptRejectPromise(_specifierString_, _promiseCapability_).
           1. Let _moduleRequest_ be a new ModuleRequest Record { [[Specifier]]: _specifierString_, [[Phase]]: _phase_ }.
@@ -1069,8 +1070,7 @@ contributors: Luca Casonato, Guy Bedford
                 <ins>GetImports()</ins>
               </td>
               <td>
-                <p><ins>For Module Records that have a source representation, returns an Array representation for the imports of the module record.</ins></p>
-                <p><ins>For Module Records that do not have a source representation, GetImports() is never called.</ins></p>
+                <p><ins>Returns an Array representation for the imports of the module record.</ins></p>
               </td>
             </tr>
           </table>
@@ -1174,13 +1174,13 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
-                [[HasTLA]]
+                <ins>[[HasDynamicImport]]</ins>
               </td>
               <td>
-                a Boolean
+                <ins>a Boolean</ins>
               </td>
               <td>
-                Whether this module is individually asynchronous (for example, if it's a Source Text Module Record containing a top-level await). Having an asynchronous dependency does not mean this field is *true*. This field must not change after the module is parsed.
+                <ins>Whether this module contains a dynamic `import()` or phased dynamic import expression.</ins>
               </td>
             </tr>
             <tr>
@@ -1196,13 +1196,13 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
-                <ins>[[HasDynamicImport]]</ins>
+                [[HasTLA]]
               </td>
               <td>
-                <ins>a Boolean</ins>
+                a Boolean
               </td>
               <td>
-                <ins>Whether this module contains a dynamic `import()` or phased dynamic import expression.</ins>
+                Whether this module is individually asynchronous (for example, if it's a Source Text Module Record containing a top-level await). Having an asynchronous dependency does not mean this field is *true*. This field must not change after the module is parsed.
               </td>
             </tr>
             <tr>
@@ -1252,8 +1252,8 @@ contributors: Luca Casonato, Guy Bedford
           </table>
         </emu-table>
 
-        <emu-clause id="sec-modulegetmetadata" type="concrete method">
-          <h1><ins>GetMetadata ( ): an Object</ins></h1>
+        <emu-clause id="sec-modulegetimports" type="concrete method">
+          <h1><ins>GetImports ( ): an Array</ins></h1>
           <dl class="header">
             <dt>for</dt>
             <dd>a Cyclic Module Record _module_</dd>
@@ -1263,7 +1263,6 @@ contributors: Luca Casonato, Guy Bedford
           </dl>
 
           <emu-alg>
-            1. Let _metadata_ be OrdinaryObjectCreate(*null*).
             1. Let _imports_ be a new empty List.
             1. For each ModuleRequest Record _request_ of _module_.[[RequestedModules]], do
               1. Let _import_ be OrdinaryObjectCreate(*null*).
@@ -1274,12 +1273,7 @@ contributors: Luca Casonato, Guy Bedford
                 1. Set _maybePhaseString_ to *"source"*.
               1. Perform ! CreateDataPropertyOrThrow(_import_, *"phase"*, _maybePhaseString_).
               1. Append _import_ to _imports_.
-            1. Let _importsArray_ be CreateArrayFromList(_imports_).
-            1. Perform ! CreateDataPropertyOrThrow(_metadata_, *"imports"*, _importsArray_).
-            1. Perform ! CreateDataPropertyOrThrow(_metadata_, *"hasDynamicImport"*, _module_.[[HasDynamicImport]]).
-            1. Perform ! CreateDataPropertyOrThrow(_metadata_, *"hasImportMeta"*, _module_.[[HasImportMeta]]).
-            1. Perform ! CreateDataPropertyOrThrow(_metadata_, *"hasTopLevelAwait"*, _module_.[[HasTLA]]).
-            1. Return _metadata_.
+            1. Return CreateArrayFromList(_imports_).
           </emu-alg>
         </emu-clause>
       </emu-clause>
@@ -1329,7 +1323,7 @@ contributors: Luca Casonato, Guy Bedford
             1. Let _async_ be _body_ Contains `await`.
             1. <ins>Let _importMeta_ be _body_ Contains |ImportMeta|</ins>.
             1. <ins>Let _dynamicImport_ be _body_ Contains |ImportCall|</ins>.
-            1. Return Source Text Module Record { [[Realm]]: _realm_, [[Environment]]: ~empty~, [[Namespace]]: ~empty~, [[ModuleSource]]: ~empty~, [[CycleRoot]]: ~empty~, [[HasTLA]]: _async_, <ins>[[HasImportMeta]]: _importMeta_, [[HasDynamicImport]]: _dynamicImport_, </ins>[[AsyncEvaluation]]: *false*, [[TopLevelCapability]]: ~empty~, [[AsyncParentModules]]: « », [[PendingAsyncDependencies]]: ~empty~, [[Status]]: ~new~, [[EvaluationError]]: ~empty~, [[HostDefined]]: _hostDefined_, [[ECMAScriptCode]]: _body_, [[Context]]: ~empty~, [[ImportMeta]]: ~empty~, [[RequestedModules]]: _requestedModules_, [[LoadedModules]]: « », [[ImportEntries]]: _importEntries_, [[LocalExportEntries]]: _localExportEntries_, [[IndirectExportEntries]]: _indirectExportEntries_, [[StarExportEntries]]: _starExportEntries_, [[DFSIndex]]: ~empty~, [[DFSAncestorIndex]]: ~empty~ }.
+            1. Return Source Text Module Record { [[Realm]]: _realm_, [[Environment]]: ~empty~, [[Namespace]]: ~empty~, [[ModuleSource]]: ~empty~, [[CycleRoot]]: ~empty~, <ins>[[HasDynamicImport]]: _dynamicImport_, [[HasImportMeta]]: _importMeta_, </ins>[[HasTLA]]: _async_, [[AsyncEvaluation]]: *false*, [[TopLevelCapability]]: ~empty~, [[AsyncParentModules]]: « », [[PendingAsyncDependencies]]: ~empty~, [[Status]]: ~new~, [[EvaluationError]]: ~empty~, [[HostDefined]]: _hostDefined_, [[ECMAScriptCode]]: _body_, [[Context]]: ~empty~, [[ImportMeta]]: ~empty~, [[RequestedModules]]: _requestedModules_, [[LoadedModules]]: « », [[ImportEntries]]: _importEntries_, [[LocalExportEntries]]: _localExportEntries_, [[IndirectExportEntries]]: _indirectExportEntries_, [[StarExportEntries]]: _starExportEntries_, [[DFSIndex]]: ~empty~, [[DFSAncestorIndex]]: ~empty~ }.
           </emu-alg>
           <emu-note>
             <p>An implementation may parse module source text and analyse it for Early Error conditions prior to the evaluation of ParseModule for that module source text. However, the reporting of any errors must be deferred until the point where this specification actually performs ParseModule upon that source text.</p>
@@ -1388,7 +1382,7 @@ contributors: Luca Casonato, Guy Bedford
           <ins>
             HostGetModuleSourceRecord (
               _moduleSource_: an Object,
-            ): either a normal completion containing a Module Record or a throw completion
+            ): either a normal completion containing either a Module Record or ~unused~, or a throw completion
           </ins>
         </h1>
         <dl class="header">
@@ -1399,13 +1393,16 @@ contributors: Luca Casonato, Guy Bedford
         <p>An implementation of HostGetModuleSourceRecord must conform to the following requirements:</p>
         <ul>
           <li>
-            For any object that is an instance of a concrete implementation of Abstract Module Source, returns a normal completion for a concrete Module Record corresponding to the canonical module for this source.
+            For any object that is an instance of a concrete implementation of Abstract Module Source that was originally obtained through GetModuleSource, returns a normal completion for a concrete Module Record corresponding to the canonical module for this source.
           </li>
           <li>
             For any ModuleSource Instance, this hook must always return the result of the GetModuleSourceSourceTextModuleRecord.
           </li>
           <li>
-            For any object which is not a Module Source Object, or was not originally obtained through GetModuleSource, returns a throw completion.
+            For any object which is a Module Source Object Instance, but was not originally obtained through GetModuleSource, returns a throw completion.
+          </li>
+          <li>
+            For any other object types, returns ~unused~ to indicate that the object is not a Module Source Object Instance.
           </li>
         </ul>
       </emu-clause>
@@ -1492,14 +1489,47 @@ contributors: Luca Casonato, Guy Bedford
         <p>The initial value of the *"name"* property of this function is *"get [Symbol.toStringTag]"*.</p>
       </emu-clause>
 
-      <emu-clause id="sec-%abstractmodulesource%.prototype.metadata">
-        <h1><ins>%AbstractModuleSource%.prototype.metadata ( )</ins></h1>
+      <emu-clause id="sec-%abstractmodulesource%.prototype.imports">
+        <h1><ins>%AbstractModuleSource%.prototype.imports ( )</ins></h1>
         <p>This method performs the following steps when called:</p>
         <emu-alg>
           1. Let _M_ be the *this* value.
           1. Let _module_ be ? HostGetModuleSourceRecord(_M_).
           1. Assert: _module_ is a Cyclic Module Record.
-          1. Return _module_.GetMetadata().
+          1. Return _module_.GetImports().
+        </emu-alg>
+      </emu-clause>
+
+      <emu-clause id="sec-%abstractmodulesource%.prototype.hasDynamicImport">
+        <h1><ins>get AbstractModuleSource.prototype.hasDynamicImport</ins></h1>
+        <p>`AbstractModuleSource.prototype.hasDynamicImport` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
+        <emu-alg>
+          1. Let _M_ be the *this* value.
+          1. Let _module_ be ? HostGetModuleSourceRecord(_M_).
+          1. Assert: _module_ is a Cyclic Module Record.
+          1. Return _module_.[[HasDynamicImport]].
+        </emu-alg>
+      </emu-clause>
+
+      <emu-clause id="sec-%abstractmodulesource%.prototype.hasImportMeta">
+        <h1><ins>get AbstractModuleSource.prototype.hasImportMeta</ins></h1>
+        <p>`AbstractModuleSource.prototype.hasImportMeta` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
+        <emu-alg>
+          1. Let _M_ be the *this* value.
+          1. Let _module_ be ? HostGetModuleSourceRecord(_M_).
+          1. Assert: _module_ is a Cyclic Module Record.
+          1. Return _module_.[[HasImportMeta]].
+        </emu-alg>
+      </emu-clause>
+
+      <emu-clause id="sec-%abstractmodulesource%.prototype.hasTopLevelAwait">
+        <h1><ins>get AbstractModuleSource.prototype.hasTopLevelAwait</ins></h1>
+        <p>`AbstractModuleSource.prototype.hasTopLevelAwait` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
+        <emu-alg>
+          1. Let _M_ be the *this* value.
+          1. Let _module_ be ? HostGetModuleSourceRecord(_M_).
+          1. Assert: _module_ is a Cyclic Module Record.
+          1. Return _module_.[[HasTLA]].
         </emu-alg>
       </emu-clause>
     </emu-clause>
