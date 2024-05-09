@@ -130,7 +130,9 @@ Returns metadata about the modular structure of the module:
 ```ts
 interface ModuleMetadata {
   imports: Import[],
-  topLevelAwait: bool,
+  hasDynamicImport: bool,
+  hasImportMeta: bool,
+  hasTopLevelAwait: bool,
 }
 ```
 
@@ -143,7 +145,10 @@ interface Import {
 }
 ```
 
-`topLevelAwait` is *true* if and only if there is usage of top-level await in the module.
+* `hasDynamicImport` is *true* if and only if there is usage of dynamic import.
+* `hasImportMeta` is *true* if and only if there is usage of import meta.
+* `hasTopLevelAwait` is *true* if and only if there is usage of top-level await in the module.
+
 
 ### Dynamic Import
 
