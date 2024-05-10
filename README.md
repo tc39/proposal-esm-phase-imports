@@ -136,15 +136,15 @@ interface Import {
 
 ### `AbstractModuleSource.prototype.hasDynamicImport`
 
-A boolean property indicating if the module may call dynamic import.
+A boolean getter property indicating if the module may call dynamic import.
 
 ### `AbstractModuleSource.prototype.hasImportMeta`
 
-A boolean property indicating if the module accesses the module `import.meta`.
+A boolean getter property indicating if the module accesses the module `import.meta`.
 
 ### `AbstractModuleSource.prototype.hasTopLevelAwait`
 
-A boolean property indicating if the module contains use of top-level await.
+A boolean getter property indicating if the module contains use of top-level await.
 
 ### Dynamic Import
 
