@@ -852,7 +852,7 @@ contributors: Luca Casonato, Guy Bedford
           1. <ins>If _specifier_ is an Object, then</ins>
             1. <ins>Let _module_ be Completion(HostGetModuleRecordFromSource(_specifier_)).</ins>
             1. <ins>IfAbruptRejectPromise(_module_, _promiseCapability_).</ins>
-            1. <ins>If _module_ is not ~unused~, then</ins>
+            1. <ins>If _module_ is not ~not-a-source~, then</ins>
               1. <ins>If _module_.[[Realm]] is not equal to current Realm Record, throw a *TypeError* exception.</ins>
               1. <ins>Perform ContinueDynamicImport(_promiseCapability_, _phase_, Completion(_module_)).</ins>
               1. <ins>Return _promiseCapability_.[[Promise]].</ins>
@@ -1382,7 +1382,7 @@ contributors: Luca Casonato, Guy Bedford
           <ins>
             HostGetModuleRecordFromSource (
               _moduleSource_: an Object,
-            ): either a normal completion containing either a Module Record or ~unused~, or a throw completion
+            ): either a normal completion containing either a Module Record or ~not-a-source~, or a throw completion
           </ins>
         </h1>
         <dl class="header">
@@ -1478,8 +1478,10 @@ contributors: Luca Casonato, Guy Bedford
           1. <del>Let _sourceNameResult_ be Completion(HostGetModuleSourceName(_O_)).</del>
           1. <del>If _sourceNameResult_ is an abrupt completion, return *undefined*.</del>
           1. <del>Let _name_ be ! _sourceNameResult_.</del>
-          1. <ins>Let _module_ be ? HostGetModuleRecordFromSource(_O_).</ins>
-          1. <ins>If _module_ is ~unused~, return *undefined*.</ins>
+          1. <ins>Let _moduleResult_ be Completion(HostGetModuleRecordFromSource(_O_)).</ins>
+          1. <ins>If _moduleResult_ is an abrupt completion, return *undefined*.</ins>
+          1. <ins>Let _module_ be ! _moduleResult_.</ins>
+          1. <ins>If _module_ is ~not-a-source~, return *undefined*.</ins>
           1. <ins>Let _name_ be _module_.GetModuleSourceName().</ins>
           1. Assert: _name_ is a String.
           1. Return _name_.
@@ -1494,6 +1496,7 @@ contributors: Luca Casonato, Guy Bedford
         <emu-alg>
           1. Let _M_ be the *this* value.
           1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
+          1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
           1. Assert: _module_ is a Cyclic Module Record.
           1. Return _module_.GetImports().
         </emu-alg>
@@ -1505,6 +1508,7 @@ contributors: Luca Casonato, Guy Bedford
         <emu-alg>
           1. Let _M_ be the *this* value.
           1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
+          1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
           1. Assert: _module_ is a Cyclic Module Record.
           1. Return _module_.[[HasDynamicImport]].
         </emu-alg>
@@ -1516,6 +1520,7 @@ contributors: Luca Casonato, Guy Bedford
         <emu-alg>
           1. Let _M_ be the *this* value.
           1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
+          1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
           1. Assert: _module_ is a Cyclic Module Record.
           1. Return _module_.[[HasImportMeta]].
         </emu-alg>
@@ -1527,6 +1532,7 @@ contributors: Luca Casonato, Guy Bedford
         <emu-alg>
           1. Let _M_ be the *this* value.
           1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
+          1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
           1. Assert: _module_ is a Cyclic Module Record.
           1. Return _module_.[[HasTLA]].
         </emu-alg>
