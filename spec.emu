@@ -850,7 +850,7 @@ contributors: Luca Casonato, Guy Bedford
           1. Let _specifier_ be ? GetValue(_specifierRef_).
           1. Let _promiseCapability_ be ! NewPromiseCapability(%Promise%).
           1. <ins>If _specifier_ is an Object, then</ins>
-            1. <ins>Let _module_ be Completion(HostGetModuleSourceRecord(_specifier_)).</ins>
+            1. <ins>Let _module_ be Completion(HostGetModuleRecordFromSource(_specifier_)).</ins>
             1. <ins>IfAbruptRejectPromise(_module_, _promiseCapability_).</ins>
             1. <ins>If _module_ is not ~unused~, then</ins>
               1. <ins>If _module_.[[Realm]] is not equal to current Realm Record, throw a *TypeError* exception.</ins>
@@ -882,13 +882,13 @@ contributors: Luca Casonato, Guy Bedford
             1. Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, &laquo; _moduleCompletion_.[[Value]] &raquo;).
             1. Return ~unused~.
           1. Let _module_ be _moduleCompletion_.[[Value]].
-          1. <ins>If _phase_ is ~source~, then</ins>
-            1. <ins>Let _moduleSourceCompletion_ be Completion(_module_.GetModuleSource()).</ins>
-            1. <ins>If _moduleSourceCompletion_ is an abrupt completion, then</ins>
-              1. <ins>Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, &laquo; _moduleSourceCompletion_.[[Value]] &raquo;).</ins>
-            1. <ins>Else,</ins>
-              1. <ins>Perform ! Call(_promiseCapability_.[[Resolve]], *undefined*, &laquo; _moduleSourceCompletion_.[[Value]] &raquo;).</ins>
-            1. <ins>Return ~unused~.</ins>
+          1. If _phase_ is ~source~, then
+            1. Let _moduleSourceCompletion_ be Completion(_module_.GetModuleSource()).
+            1. If _moduleSourceCompletion_ is an abrupt completion, then
+              1. Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, &laquo; _moduleSourceCompletion_.[[Value]] &raquo;).
+            1. Else,
+              1. Perform ! Call(_promiseCapability_.[[Resolve]], *undefined*, &laquo; _moduleSourceCompletion_.[[Value]] &raquo;).
+            1. Return ~unused~.
           1. Let _loadPromise_ be _module_.LoadRequestedModules().
           1. Let _rejectedClosure_ be a new Abstract Closure with parameters (_reason_) that captures _promiseCapability_ and performs the following steps when called:
             1. Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, &laquo; _reason_ &raquo;).
@@ -1377,10 +1377,10 @@ contributors: Luca Casonato, Guy Bedford
         </ul>
       </emu-clause>
 
-      <emu-clause id="sec-HostGetModuleSourceRecord" type="host-defined abstract operation">
+      <emu-clause id="sec-HostGetModuleRecordFromSource" type="host-defined abstract operation">
         <h1>
           <ins>
-            HostGetModuleSourceRecord (
+            HostGetModuleRecordFromSource (
               _moduleSource_: an Object,
             ): either a normal completion containing either a Module Record or ~unused~, or a throw completion
           </ins>
@@ -1390,7 +1390,7 @@ contributors: Luca Casonato, Guy Bedford
           <dd></dd>
         </dl>
 
-        <p>An implementation of HostGetModuleSourceRecord must conform to the following requirements:</p>
+        <p>An implementation of HostGetModuleRecordFromSource must conform to the following requirements:</p>
         <ul>
           <li>
             For any object that is an instance of a concrete implementation of Abstract Module Source that was originally obtained through GetModuleSource, returns a normal completion for a concrete Module Record corresponding to the canonical module for this source.
@@ -1415,7 +1415,7 @@ contributors: Luca Casonato, Guy Bedford
   <emu-clause id="sec-module-source-objects">
     <h1>Module Source Objects</h1>
     <p>Module Source Objects represent modules in their source import phase, which are not linked, instantiated or executed.</p>
-    <p>A <dfn>Module Source Object</dfn> is an object for which <del>HostGetModuleSourceName</del><ins>HostGetModuleSourceRecord</ins> returns a normal completion.</p>
+    <p>A <dfn>Module Source Object</dfn> is an object for which <del>HostGetModuleSourceName</del><ins>HostGetModuleRecordFromSource</ins> returns a normal completion.</p>
     <p>All Module Source Objects should have a prototype of %AbstractModuleSource%.prototype.</p>
     <p>Hosts may define their own %AbstractModuleSource% subclasses for custom module types.</p>
 
@@ -1478,9 +1478,8 @@ contributors: Luca Casonato, Guy Bedford
           1. <del>Let _sourceNameResult_ be Completion(HostGetModuleSourceName(_O_)).</del>
           1. <del>If _sourceNameResult_ is an abrupt completion, return *undefined*.</del>
           1. <del>Let _name_ be ! _sourceNameResult_.</del>
-          1. <ins>Let _moduleResult_ be Completion(HostGetModuleSourceRecord(_O_)).</ins>
-          1. <ins>If _moduleResult_ is an abrupt completion, return *undefined*.</ins>
-          1. <ins>Let _module_ be ! _moduleResult_.</ins>
+          1. <ins>Let _module_ be ? HostGetModuleRecordFromSource(_O_).</ins>
+          1. <ins>If _module_ is ~unused~, return *undefined*.</ins>
           1. <ins>Let _name_ be _module_.GetModuleSourceName().</ins>
           1. Assert: _name_ is a String.
           1. Return _name_.
@@ -1494,7 +1493,7 @@ contributors: Luca Casonato, Guy Bedford
         <p>This method performs the following steps when called:</p>
         <emu-alg>
           1. Let _M_ be the *this* value.
-          1. Let _module_ be ? HostGetModuleSourceRecord(_M_).
+          1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
           1. Assert: _module_ is a Cyclic Module Record.
           1. Return _module_.GetImports().
         </emu-alg>
@@ -1505,7 +1504,7 @@ contributors: Luca Casonato, Guy Bedford
         <p>`AbstractModuleSource.prototype.hasDynamicImport` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
         <emu-alg>
           1. Let _M_ be the *this* value.
-          1. Let _module_ be ? HostGetModuleSourceRecord(_M_).
+          1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
           1. Assert: _module_ is a Cyclic Module Record.
           1. Return _module_.[[HasDynamicImport]].
         </emu-alg>
@@ -1516,7 +1515,7 @@ contributors: Luca Casonato, Guy Bedford
         <p>`AbstractModuleSource.prototype.hasImportMeta` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
         <emu-alg>
           1. Let _M_ be the *this* value.
-          1. Let _module_ be ? HostGetModuleSourceRecord(_M_).
+          1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
           1. Assert: _module_ is a Cyclic Module Record.
           1. Return _module_.[[HasImportMeta]].
         </emu-alg>
@@ -1527,7 +1526,7 @@ contributors: Luca Casonato, Guy Bedford
         <p>`AbstractModuleSource.prototype.hasTopLevelAwait` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
         <emu-alg>
           1. Let _M_ be the *this* value.
-          1. Let _module_ be ? HostGetModuleSourceRecord(_M_).
+          1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
           1. Assert: _module_ is a Cyclic Module Record.
           1. Return _module_.[[HasTLA]].
         </emu-alg>
@@ -1589,7 +1588,7 @@ contributors: Luca Casonato, Guy Bedford
           1. Return _M_.[[SourceTextModuleRecord]].
         </emu-alg>
         <emu-note>
-          <p>This abstract operation is the required implementation of HostGetModuleSourceRecord for any object which is a ModuleSource Instance.</p>
+          <p>This abstract operation is the required implementation of HostGetModuleRecordFromSource for any object which is a ModuleSource Instance.</p>
         </emu-note>
       </emu-clause>
     </emu-clause>
@@ -1609,7 +1608,7 @@ contributors: Luca Casonato, Guy Bedford
     <p><b>HostEnsureCanCompileStrings(...)</b></p>
     <p><b>HostFinalizeImportMeta(...)</b></p>
     <p><b>HostGetImportMetaProperties(...)</b></p>
-    <p><b><del>HostGetModuleSourceName</del><ins>HostGetModuleSourceRecord</ins>(...)</b></p>
+    <p><b><del>HostGetModuleSourceName</del><ins>HostGetModuleRecordFromSource</ins>(...)</b></p>
     <p><b>HostGrowSharedArrayBuffer(...)</b></p>
     <p><b>HostHasSourceTextAvailable(...)</b></p>
     <p><b>HostLoadImportedModule(...)</b></p>
