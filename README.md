@@ -123,42 +123,28 @@ These helper methods are designed to allow for determining the static public exp
 imports of a module, but do not give information about the internal module identifiers or dynamic
 import.
 
-### `ModuleSource.prototype.imports()`
+### `AbstractModuleSource.prototype.imports()`
 
-Returns the ordered list of the dependencies `Import[]`, defined by:
+Returns a list of the imports of the module of the form `Import[]` defined by:
 
 ```ts
 interface Import {
   specifier: string,
-  attributes: null | {
-    [key: string]: string
-  },
   phase: null | 'source'
 }
 ```
 
-Note that all `export` statements with a `from` clause are reflected as imports as well as
-being reflected on exports.
+### `AbstractModuleSource.prototype.hasDynamicImport`
 
-### `ModuleSource.prototype.exports()`
+A boolean getter property indicating if the module may call dynamic import.
 
-Returns the list of public exports `(Export | StarReexport)[]`, defined by:
+### `AbstractModuleSource.prototype.hasImportMeta`
 
-```ts
-interface Export {
-  type: 'export',
-  name: string,
-}
+A boolean getter property indicating if the module accesses the module `import.meta`.
 
-interface StarReexport {
-  type: 'star-reexport',
-  from: Import
-}
-```
+### `AbstractModuleSource.prototype.hasTopLevelAwait`
 
-`Export` is provided for both re-exports and local exports. For example,
-`export * as X from './x.js'` would be reflected as the export `{ type: 'export', name: 'x' }`,
-and then also appear in the `Import` dependency list separately.
+A boolean getter property indicating if the module contains use of top-level await.
 
 ### Dynamic Import
 

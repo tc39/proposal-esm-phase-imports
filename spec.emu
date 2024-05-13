@@ -9,31 +9,1618 @@ stage: 1
 contributors: Luca Casonato, Guy Bedford
 </pre>
 
-<emu-clause id="sec-demo-clause">
-  <h1>This is an emu-clause</h1>
-  <p>This is an algorithm:</p>
-  <emu-alg>
-    1. Let _proposal_ be *undefined*.
-    1. If IsAccepted(_proposal_) is *true*, then
-      1. Let _stage_ be *0*<sub>ℤ</sub>.
-    1. Else,
-      1. Let _stage_ be *-1*<sub>ℤ</sub>.
-    1. Return ? ToString(_stage_).
-  </emu-alg>
+<emu-clause id="sec-ecmascript-data-types-and-values" aoid="Type">
+  <h1>ECMAScript Data Types and Values</h1>
+  <emu-clause id="sec-ecmascript-language-types">
+    <h1>ECMAScript Language Types</h1>
+    <emu-clause id="sec-object-type">
+      <h1>Object Type</h1>
+      <emu-clause id="sec-well-known-intrinsic-objects">
+        <h1>Well-Known Intrinsic Objects</h1>
+        <p>Well-known intrinsics are built-in objects that are explicitly referenced by the algorithms of this specification and which usually have realm-specific identities. Unless otherwise specified each intrinsic object actually corresponds to a set of similar objects, one per realm.</p>
+        <p>Within this specification a reference such as %name% means the intrinsic object, associated with the current realm, corresponding to the name. A reference such as %name.a.b% means, as if the *"b"* property of the value of the *"a"* property of the intrinsic object %name% was accessed prior to any ECMAScript code being evaluated. Determination of the current realm and its intrinsics is described in <emu-xref href="#sec-execution-contexts"></emu-xref>. The well-known intrinsics are listed in <emu-xref href="#table-well-known-intrinsic-objects"></emu-xref>.</p>
+        <emu-table id="table-well-known-intrinsic-objects" caption="Well-Known Intrinsic Objects" oldids="table-7">
+          <table>
+            <tr>
+              <th>
+                Intrinsic Name
+              </th>
+              <th>
+                Global Name
+              </th>
+              <th>
+                ECMAScript Language Association
+              </th>
+            </tr>
+            <tr>
+              <td>
+                %AbstractModuleSource%
+              </td>
+              <td>
+              </td>
+              <td>
+                The %AbstractModuleSource% constructor (<emu-xref href="#sec-%abstractmodulesource%-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %AggregateError%
+              </td>
+              <td>
+                `AggregateError`
+              </td>
+              <td>
+                The `AggregateError` constructor (<emu-xref href="#sec-aggregate-error-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Array%
+              </td>
+              <td>
+                `Array`
+              </td>
+              <td>
+                The Array constructor (<emu-xref href="#sec-array-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %ArrayBuffer%
+              </td>
+              <td>
+                `ArrayBuffer`
+              </td>
+              <td>
+                The ArrayBuffer constructor (<emu-xref href="#sec-arraybuffer-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %ArrayIteratorPrototype%
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of Array iterator objects (<emu-xref href="#sec-array-iterator-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %AsyncFromSyncIteratorPrototype%
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of async-from-sync iterator objects (<emu-xref href="#sec-async-from-sync-iterator-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %AsyncFunction%
+              </td>
+              <td>
+              </td>
+              <td>
+                The constructor of async function objects (<emu-xref href="#sec-async-function-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %AsyncGeneratorFunction%
+              </td>
+              <td>
+              </td>
+              <td>
+                The constructor of async generator function objects (<emu-xref href="#sec-asyncgeneratorfunction-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %AsyncGeneratorPrototype%
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of async generator objects (<emu-xref href="#sec-asyncgenerator-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %AsyncIteratorPrototype%
+              </td>
+              <td>
+              </td>
+              <td>
+                An object that all standard built-in async iterator objects indirectly inherit from
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Atomics%
+              </td>
+              <td>
+                `Atomics`
+              </td>
+              <td>
+                The `Atomics` object (<emu-xref href="#sec-atomics-object"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %BigInt%
+              </td>
+              <td>
+                `BigInt`
+              </td>
+              <td>
+                The BigInt constructor (<emu-xref href="#sec-bigint-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %BigInt64Array%
+              </td>
+              <td>
+                `BigInt64Array`
+              </td>
+              <td>
+                The BigInt64Array constructor (<emu-xref href="#sec-typedarray-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %BigUint64Array%
+              </td>
+              <td>
+                `BigUint64Array`
+              </td>
+              <td>
+                The BigUint64Array constructor (<emu-xref href="#sec-typedarray-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Boolean%
+              </td>
+              <td>
+                `Boolean`
+              </td>
+              <td>
+                The Boolean constructor (<emu-xref href="#sec-boolean-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %DataView%
+              </td>
+              <td>
+                `DataView`
+              </td>
+              <td>
+                The DataView constructor (<emu-xref href="#sec-dataview-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Date%
+              </td>
+              <td>
+                `Date`
+              </td>
+              <td>
+                The Date constructor (<emu-xref href="#sec-date-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %decodeURI%
+              </td>
+              <td>
+                `decodeURI`
+              </td>
+              <td>
+                The `decodeURI` function (<emu-xref href="#sec-decodeuri-encodeduri"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %decodeURIComponent%
+              </td>
+              <td>
+                `decodeURIComponent`
+              </td>
+              <td>
+                The `decodeURIComponent` function (<emu-xref href="#sec-decodeuricomponent-encodeduricomponent"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %encodeURI%
+              </td>
+              <td>
+                `encodeURI`
+              </td>
+              <td>
+                The `encodeURI` function (<emu-xref href="#sec-encodeuri-uri"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %encodeURIComponent%
+              </td>
+              <td>
+                `encodeURIComponent`
+              </td>
+              <td>
+                The `encodeURIComponent` function (<emu-xref href="#sec-encodeuricomponent-uricomponent"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Error%
+              </td>
+              <td>
+                `Error`
+              </td>
+              <td>
+                The Error constructor (<emu-xref href="#sec-error-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %eval%
+              </td>
+              <td>
+                `eval`
+              </td>
+              <td>
+                The `eval` function (<emu-xref href="#sec-eval-x"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %EvalError%
+              </td>
+              <td>
+                `EvalError`
+              </td>
+              <td>
+                The EvalError constructor (<emu-xref href="#sec-native-error-types-used-in-this-standard-evalerror"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %FinalizationRegistry%
+              </td>
+              <td>
+                `FinalizationRegistry`
+              </td>
+              <td>
+                The FinalizationRegistry constructor (<emu-xref href="#sec-finalization-registry-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Float32Array%
+              </td>
+              <td>
+                `Float32Array`
+              </td>
+              <td>
+                The Float32Array constructor (<emu-xref href="#sec-typedarray-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Float64Array%
+              </td>
+              <td>
+                `Float64Array`
+              </td>
+              <td>
+                The Float64Array constructor (<emu-xref href="#sec-typedarray-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %ForInIteratorPrototype%
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of For-In iterator objects (<emu-xref href="#sec-for-in-iterator-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Function%
+              </td>
+              <td>
+                `Function`
+              </td>
+              <td>
+                The Function constructor (<emu-xref href="#sec-function-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %GeneratorFunction%
+              </td>
+              <td>
+              </td>
+              <td>
+                The constructor of generator function objects (<emu-xref href="#sec-generatorfunction-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %GeneratorPrototype%
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of generator objects (<emu-xref href="#sec-generator-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Int8Array%
+              </td>
+              <td>
+                `Int8Array`
+              </td>
+              <td>
+                The Int8Array constructor (<emu-xref href="#sec-typedarray-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Int16Array%
+              </td>
+              <td>
+                `Int16Array`
+              </td>
+              <td>
+                The Int16Array constructor (<emu-xref href="#sec-typedarray-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Int32Array%
+              </td>
+              <td>
+                `Int32Array`
+              </td>
+              <td>
+                The Int32Array constructor (<emu-xref href="#sec-typedarray-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %isFinite%
+              </td>
+              <td>
+                `isFinite`
+              </td>
+              <td>
+                The `isFinite` function (<emu-xref href="#sec-isfinite-number"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %isNaN%
+              </td>
+              <td>
+                `isNaN`
+              </td>
+              <td>
+                The `isNaN` function (<emu-xref href="#sec-isnan-number"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %IteratorPrototype%
+              </td>
+              <td>
+              </td>
+              <td>
+                An object that all standard built-in iterator objects indirectly inherit from
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %JSON%
+              </td>
+              <td>
+                `JSON`
+              </td>
+              <td>
+                The `JSON` object (<emu-xref href="#sec-json-object"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Map%
+              </td>
+              <td>
+                `Map`
+              </td>
+              <td>
+                The Map constructor (<emu-xref href="#sec-map-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %MapIteratorPrototype%
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of Map iterator objects (<emu-xref href="#sec-map-iterator-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Math%
+              </td>
+              <td>
+                `Math`
+              </td>
+              <td>
+                The `Math` object (<emu-xref href="#sec-math-object"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <ins>%ModuleSource%</ins>
+              </td>
+              <td>
+                <ins>`ModuleSource`</ins>
+              </td>
+              <td>
+                <ins>A `ModuleSource` object (<emu-xref href="#sec-module-source-object"></emu-xref>)</ins>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Number%
+              </td>
+              <td>
+                `Number`
+              </td>
+              <td>
+                The Number constructor (<emu-xref href="#sec-number-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Object%
+              </td>
+              <td>
+                `Object`
+              </td>
+              <td>
+                The Object constructor (<emu-xref href="#sec-object-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %parseFloat%
+              </td>
+              <td>
+                `parseFloat`
+              </td>
+              <td>
+                The `parseFloat` function (<emu-xref href="#sec-parsefloat-string"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %parseInt%
+              </td>
+              <td>
+                `parseInt`
+              </td>
+              <td>
+                The `parseInt` function (<emu-xref href="#sec-parseint-string-radix"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Promise%
+              </td>
+              <td>
+                `Promise`
+              </td>
+              <td>
+                The Promise constructor (<emu-xref href="#sec-promise-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Proxy%
+              </td>
+              <td>
+                `Proxy`
+              </td>
+              <td>
+                The Proxy constructor (<emu-xref href="#sec-proxy-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %RangeError%
+              </td>
+              <td>
+                `RangeError`
+              </td>
+              <td>
+                The RangeError constructor (<emu-xref href="#sec-native-error-types-used-in-this-standard-rangeerror"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %ReferenceError%
+              </td>
+              <td>
+                `ReferenceError`
+              </td>
+              <td>
+                The ReferenceError constructor (<emu-xref href="#sec-native-error-types-used-in-this-standard-referenceerror"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Reflect%
+              </td>
+              <td>
+                `Reflect`
+              </td>
+              <td>
+                The `Reflect` object (<emu-xref href="#sec-reflect-object"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %RegExp%
+              </td>
+              <td>
+                `RegExp`
+              </td>
+              <td>
+                The RegExp constructor (<emu-xref href="#sec-regexp-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %RegExpStringIteratorPrototype%
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of RegExp String Iterator objects (<emu-xref href="#sec-regexp-string-iterator-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Set%
+              </td>
+              <td>
+                `Set`
+              </td>
+              <td>
+                The Set constructor (<emu-xref href="#sec-set-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %SetIteratorPrototype%
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of Set iterator objects (<emu-xref href="#sec-set-iterator-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %SharedArrayBuffer%
+              </td>
+              <td>
+                `SharedArrayBuffer`
+              </td>
+              <td>
+                The SharedArrayBuffer constructor (<emu-xref href="#sec-sharedarraybuffer-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %String%
+              </td>
+              <td>
+                `String`
+              </td>
+              <td>
+                The String constructor (<emu-xref href="#sec-string-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %StringIteratorPrototype%
+              </td>
+              <td>
+              </td>
+              <td>
+                The prototype of String iterator objects (<emu-xref href="#sec-string-iterator-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Symbol%
+              </td>
+              <td>
+                `Symbol`
+              </td>
+              <td>
+                The Symbol constructor (<emu-xref href="#sec-symbol-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %SyntaxError%
+              </td>
+              <td>
+                `SyntaxError`
+              </td>
+              <td>
+                The SyntaxError constructor (<emu-xref href="#sec-native-error-types-used-in-this-standard-syntaxerror"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %ThrowTypeError%
+              </td>
+              <td>
+              </td>
+              <td>
+                A function object that unconditionally throws a new instance of %TypeError%
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %TypedArray%
+              </td>
+              <td>
+              </td>
+              <td>
+                The super class of all typed Array constructors (<emu-xref href="#sec-%typedarray%-intrinsic-object"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %TypeError%
+              </td>
+              <td>
+                `TypeError`
+              </td>
+              <td>
+                The TypeError constructor (<emu-xref href="#sec-native-error-types-used-in-this-standard-typeerror"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Uint8Array%
+              </td>
+              <td>
+                `Uint8Array`
+              </td>
+              <td>
+                The Uint8Array constructor (<emu-xref href="#sec-typedarray-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Uint8ClampedArray%
+              </td>
+              <td>
+                `Uint8ClampedArray`
+              </td>
+              <td>
+                The Uint8ClampedArray constructor (<emu-xref href="#sec-typedarray-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Uint16Array%
+              </td>
+              <td>
+                `Uint16Array`
+              </td>
+              <td>
+                The Uint16Array constructor (<emu-xref href="#sec-typedarray-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %Uint32Array%
+              </td>
+              <td>
+                `Uint32Array`
+              </td>
+              <td>
+                The Uint32Array constructor (<emu-xref href="#sec-typedarray-objects"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %URIError%
+              </td>
+              <td>
+                `URIError`
+              </td>
+              <td>
+                The URIError constructor (<emu-xref href="#sec-native-error-types-used-in-this-standard-urierror"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %WeakMap%
+              </td>
+              <td>
+                `WeakMap`
+              </td>
+              <td>
+                The WeakMap constructor (<emu-xref href="#sec-weakmap-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %WeakRef%
+              </td>
+              <td>
+                `WeakRef`
+              </td>
+              <td>
+                The WeakRef constructor (<emu-xref href="#sec-weak-ref-constructor"></emu-xref>)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                %WeakSet%
+              </td>
+              <td>
+                `WeakSet`
+              </td>
+              <td>
+                The WeakSet constructor (<emu-xref href="#sec-weakset-constructor"></emu-xref>)
+              </td>
+            </tr>
+          </table>
+        </emu-table>
+        <emu-note>
+          <p>Additional entries in <emu-xref href="#table-additional-well-known-intrinsic-objects"></emu-xref>.</p>
+        </emu-note>
+      </emu-clause>
+    </emu-clause>
+  </emu-clause>
 </emu-clause>
 
-<emu-clause id="sec-is-accepted" type="abstract operation">
-  <h1>
-      IsAccepted (
-        _proposal_: an ECMAScript language value
-      ): a Boolean
-  </h1>
-  <dl class="header">
-    <dt>description</dt>
-    <dd>Tells you if the proposal was accepted</dd>
-  </dl>
-  <emu-alg>
-    1. If _proposal_ is not a String, or is not accepted, return *false*.
-    1. Return *true*.
-  </emu-alg>
+<emu-clause id="sec-ecmascript-language-expressions" number="13">
+  <h1>ECMAScript Language: Expressions</h1>
+
+  <emu-clause id="sec-left-hand-side-expressions" number="3">
+    <h1>Left-Hand-Side Expressions</h1>
+    <h2>Syntax</h2>
+    <emu-grammar type="definition">
+      ImportCall[Yield, Await] :
+        `import` `(` AssignmentExpression[+In, ?Yield, ?Await] `)`
+        `import` `.` `source` `(` AssignmentExpression[+In, ?Yield, ?Await] `)`
+    </emu-grammar>
+
+    <emu-clause id="sec-import-calls" number="10">
+      <h1>Import Calls</h1>
+
+      <emu-clause id="sec-import-call-runtime-semantics-evaluation" type="sdo">
+        <h1>Runtime Semantics: Evaluation</h1>
+
+        <emu-grammar>ImportCall : `import` `(` AssignmentExpression[+In, ?Yield, ?Await] `)`</emu-grammar>
+        <emu-alg>
+          1. Return ? EvaluateImportCall(|AssignmentExpression|, ~evaluation~).
+        </emu-alg>
+
+        <emu-grammar>ImportCall : `import` `.` `source` `(` AssignmentExpression[+In, ?Yield, ?Await] `)`</emu-grammar>
+        <emu-alg>
+          1. Return ? EvaluateImportCall(|AssignmentExpression|, ~source~).
+        </emu-alg>
+      </emu-clause>
+
+      <emu-clause id="sec-evaluate-import-call" type="abstract operation">
+        <h1>
+            EvaluateImportCall (
+              _specifierExpression_: a Parse Node,
+              _phase_: ~source~ or ~evaluation~
+            ): either a normal completion containing a Promise or a throw completion
+        </h1>
+        <dl class="header"></dl>
+        <emu-alg>
+          1. Let _referrer_ be GetActiveScriptOrModule().
+          1. If _referrer_ is *null*, set _referrer_ to the current Realm Record.
+          1. Let _specifierRef_ be ? Evaluation of evaluating _specifierExpression_.
+          1. Let _specifier_ be ? GetValue(_specifierRef_).
+          1. Let _promiseCapability_ be ! NewPromiseCapability(%Promise%).
+          1. <ins>If _specifier_ is an Object, then</ins>
+            1. <ins>Let _module_ be Completion(HostGetModuleRecordFromSource(_specifier_)).</ins>
+            1. <ins>IfAbruptRejectPromise(_module_, _promiseCapability_).</ins>
+            1. <ins>If _module_ is not ~not-a-source~, then</ins>
+              1. <ins>If _module_.[[Realm]] is not equal to current Realm Record, throw a *TypeError* exception.</ins>
+              1. <ins>Perform ContinueDynamicImport(_promiseCapability_, _phase_, Completion(_module_)).</ins>
+              1. <ins>Return _promiseCapability_.[[Promise]].</ins>
+          1. Let _specifierString_ be Completion(ToString(_specifier_)).
+          1. IfAbruptRejectPromise(_specifierString_, _promiseCapability_).
+          1. Let _moduleRequest_ be a new ModuleRequest Record { [[Specifier]]: _specifierString_, [[Phase]]: _phase_ }.
+          1. Perform HostLoadImportedModule(_referrer_, _moduleRequest_, ~empty~, _promiseCapability_).
+          1. Return _promiseCapability_.[[Promise]].
+        </emu-alg>
+        </emu-clause>
+      </emu-clause>
+
+      <emu-clause id="sec-ContinueDynamicImport" type="abstract operation">
+        <h1>
+          ContinueDynamicImport (
+            _promiseCapability_: a PromiseCapability Record,
+            <ins>_phase_: ~source~ or ~evaluation~,</ins>
+            _moduleCompletion_: either a normal completion containing a Module Record or a throw completion,
+          ): ~unused~
+        </h1>
+        <dl class="header">
+          <dt>description</dt>
+          <dd>It completes the process of a dynamic import originally started by an <emu-xref href="#sec-import-calls">`import()`</emu-xref> call, resolving or rejecting the promise returned by that call as appropriate.</dd>
+        </dl>
+        <emu-alg>
+          1. If _moduleCompletion_ is an abrupt completion, then
+            1. Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, &laquo; _moduleCompletion_.[[Value]] &raquo;).
+            1. Return ~unused~.
+          1. Let _module_ be _moduleCompletion_.[[Value]].
+          1. If _phase_ is ~source~, then
+            1. Let _moduleSourceCompletion_ be Completion(_module_.GetModuleSource()).
+            1. If _moduleSourceCompletion_ is an abrupt completion, then
+              1. Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, &laquo; _moduleSourceCompletion_.[[Value]] &raquo;).
+            1. Else,
+              1. Perform ! Call(_promiseCapability_.[[Resolve]], *undefined*, &laquo; _moduleSourceCompletion_.[[Value]] &raquo;).
+            1. Return ~unused~.
+          1. Let _loadPromise_ be _module_.LoadRequestedModules().
+          1. Let _rejectedClosure_ be a new Abstract Closure with parameters (_reason_) that captures _promiseCapability_ and performs the following steps when called:
+            1. Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, &laquo; _reason_ &raquo;).
+            1. Return ~unused~.
+          1. Let _onRejected_ be CreateBuiltinFunction(_rejectedClosure_, 1, *""*, &laquo; &raquo;).
+          1. Let _linkAndEvaluateClosure_ be a new Abstract Closure with no parameters that captures _module_, _promiseCapability_, and _onRejected_ and performs the following steps when called:
+            1. Let _link_ be Completion(_module_.Link()).
+            1. If _link_ is an abrupt completion, then
+              1. Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, &laquo; _link_.[[Value]] &raquo;).
+              1. Return ~unused~.
+            1. Let _evaluatePromise_ be _module_.Evaluate().
+            1. Let _fulfilledClosure_ be a new Abstract Closure with no parameters that captures _module_ and _promiseCapability_ and performs the following steps when called:
+              1. Let _namespace_ be GetModuleNamespace(_module_).
+              1. Perform ! Call(_promiseCapability_.[[Resolve]], *undefined*, &laquo; _namespace_ &raquo;).
+              1. Return ~unused~.
+            1. Let _onFulfilled_ be CreateBuiltinFunction(_fulfilledClosure_, *""*, 0, &laquo; &raquo;).
+            1. Perform PerformPromiseThen(_evaluatePromise_, _onFulfilled_, _onRejected_).
+          1. Let _linkAndEvaluate_ be CreateBuiltinFunction(_linkAndEvaluateClosure_, *""*, 0, &laquo; &raquo;).
+          1. Perform PerformPromiseThen(_loadPromise_, _linkAndEvaluate_, _onRejected_).
+          1. Return ~unused~.
+        </emu-alg>
+      </emu-clause>
+    </emu-clause>
+  </emu-clause>
 </emu-clause>
+
+<emu-clause id="sec-ecmascript-language-scripts-and-modules" number="16">
+  <h1>ECMAScript Language: Scripts and Modules</h1>
+
+  <emu-clause id="sec-modules">
+    <h1>Modules</h1>
+
+    <emu-clause id="sec-module-semantics">
+      <h1>Module Semantics</h1>
+
+      <emu-clause id="sec-abstract-module-records">
+        <h1>Abstract Module Records</h1>
+        <p>A <dfn variants="Module Records">Module Record</dfn> encapsulates structural information about the imports and exports of a single module. This information is used to link the imports and exports of sets of connected modules. A Module Record includes four fields that are only used when evaluating a module.</p>
+        <p>For specification purposes Module Record values are values of the Record specification type and can be thought of as existing in a simple object-oriented hierarchy where Module Record is an abstract class with both abstract and concrete subclasses. This specification defines the abstract subclass named Cyclic Module Record and its concrete subclass named Source Text Module Record. Other specifications and implementations may define additional Module Record subclasses corresponding to alternative module definition facilities that they defined.</p>
+        <p>Module Record defines the fields listed in <emu-xref href="#table-module-record-fields"></emu-xref>. All Module Definition subclasses include at least those fields. Module Record also defines the abstract method list in <emu-xref href="#table-abstract-methods-of-module-records"></emu-xref>. All Module definition subclasses must provide concrete implementations of these abstract methods.</p>
+        <emu-table id="table-module-record-fields" caption="Module Record Fields" oldids="table-36">
+          <table>
+            <thead>
+              <tr>
+                <th>
+                  Field Name
+                </th>
+                <th>
+                  Value Type
+                </th>
+                <th>
+                  Meaning
+                </th>
+              </tr>
+            </thead>
+            <tr>
+              <td>
+                [[Realm]]
+              </td>
+              <td>
+                a Realm Record
+              </td>
+              <td>
+                The Realm within which this module was created.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                [[Environment]]
+              </td>
+              <td>
+                a Module Environment Record or ~empty~
+              </td>
+              <td>
+                The Environment Record containing the top level bindings for this module. This field is set when the module is linked.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                [[Namespace]]
+              </td>
+              <td>
+                an Object or ~empty~
+              </td>
+              <td>
+                The Module Namespace Object (<emu-xref href="#sec-module-namespace-objects"></emu-xref>) if one has been created for this module.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                [[HostDefined]]
+              </td>
+              <td>
+                anything (default value is *undefined*)
+              </td>
+              <td>
+                Field reserved for use by host environments that need to associate additional information with a module.
+              </td>
+            </tr>
+          </table>
+        </emu-table>
+        <emu-table id="table-abstract-methods-of-module-records" caption="Abstract Methods of Module Records" oldids="table-37">
+          <table>
+            <tr>
+              <th>
+                Method
+              </th>
+              <th>
+                Purpose
+              </th>
+            </tr>
+            <tr>
+              <td>
+                LoadRequestedModules( [ _hostDefined_ ] )
+              </td>
+              <td>
+                <p>Prepares the module for linking by recursively loading all its dependencies, and returns a promise.</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                GetExportedNames([_exportStarSet_])
+              </td>
+              <td>
+                <p>Return a list of all names that are either directly or indirectly exported from this module.</p>
+                <p>LoadRequestedModules must have completed successfully prior to invoking this method.</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                ResolveExport(_exportName_ [, _resolveSet_])
+              </td>
+              <td>
+                <p>Return the binding of a name exported by this module. Bindings are represented by a <dfn id="resolvedbinding-record" variants="ResolvedBinding Records">ResolvedBinding Record</dfn>, of the form { [[Module]]: Module Record, [[BindingName]]: String | ~namespace~ }. If the export is a Module Namespace Object without a direct binding in any module, [[BindingName]] will be set to ~namespace~. Return *null* if the name cannot be resolved, or ~ambiguous~ if multiple bindings were found.</p>
+                <p>Each time this operation is called with a specific _exportName_, _resolveSet_ pair as arguments it must return the same result.</p>
+                <p>LoadRequestedModules must have completed successfully prior to invoking this method.</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                Link()
+              </td>
+              <td>
+                <p>Prepare the module for evaluation by transitively resolving all module dependencies and creating a Module Environment Record.</p>
+                <p>LoadRequestedModules must have completed successfully prior to invoking this method.</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                Evaluate()
+              </td>
+              <td>
+                <p>Returns a promise for the evaluation of this module and its dependencies, resolving on successful evaluation or if it has already been evaluated successfully, and rejecting for an evaluation error or if it has already been evaluated unsuccessfully. If the promise is rejected, hosts are expected to handle the promise rejection and rethrow the evaluation error.</p>
+                <p>Link must have completed successfully prior to invoking this method.</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                GetModuleSource()
+              </td>
+              <td>
+                <p>It returns either a normal completion containing the Module Source Object corresponding to this source Module Record's source phase (<emu-xref href="#sec-module-source-objects"></emu-xref>), or a throw completion.</p>
+                <p>When called multiple times on the same Module Record, if GetModuleSource() returns a normal completion it must always return a normal completion containing the same object.</p>
+                <p>The returned object should have a [[Prototype]] internal slot whose value is %AbstractModuleSource.prototype%.</p>
+                <p>For Module Records that do not have a source representation, GetModuleSource() must always return a throw completion whose [[Value]] is a *ReferenceError*.</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <ins>GetModuleSourceName()</ins>
+              </td>
+              <td>
+                <p><ins>For Module Records that implement a normal completion for GetModuleSource(), returns a constant String for each concrete module record that exposes a source representation through `GetModuleSource()`, to be provided in the strongly branded return value of the @@toStringTag getter on %AbstractModuleSource%.</ins></p>
+                <p><ins>For Module Records that do not have a source representation, GetModuleSourceName() is never called.</ins></p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <ins>GetImports()</ins>
+              </td>
+              <td>
+                <p><ins>Returns an Array representation for the imports of the module record.</ins></p>
+              </td>
+            </tr>
+          </table>
+        </emu-table>
+      </emu-clause>
+
+      <emu-clause id="sec-cyclic-module-records">
+        <h1>Cyclic Module Records</h1>
+
+        <p>A <dfn id="cyclic-module-record" variants="Cyclic Module Records">Cyclic Module Record</dfn> is used to represent information about a module that can participate in dependency cycles with other modules that are subclasses of the Cyclic Module Record type. Module Records that are not subclasses of the Cyclic Module Record type must not participate in dependency cycles with Source Text Module Records.</p>
+        <p>In addition to the fields defined in <emu-xref href="#table-module-record-fields"></emu-xref> Cyclic Module Records have the additional fields listed in <emu-xref href="#table-cyclic-module-fields"></emu-xref></p>
+        <emu-table id="table-cyclic-module-fields" caption="Additional Fields of Cyclic Module Records">
+          <table>
+            <tr>
+              <th>
+                Field Name
+              </th>
+              <th>
+                Value Type
+              </th>
+              <th>
+                Meaning
+              </th>
+            </tr>
+            <tr>
+              <td>
+                [[Status]]
+              </td>
+              <td>
+                ~unlinked~, ~linking~, ~linked~, ~evaluating~, ~evaluating-async~, or ~evaluated~
+              </td>
+              <td>
+                Initially ~unlinked~. Transitions to ~linking~, ~linked~, ~evaluating~, possibly ~evaluating-async~, ~evaluated~ (in that order) as the module progresses throughout its lifecycle. ~evaluating-async~ indicates this module is queued to execute on completion of its asynchronous dependencies or it is a module whose [[HasTLA]] field is *true* that has been executed and is pending top-level completion.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                [[EvaluationError]]
+              </td>
+              <td>
+                a throw completion or ~empty~
+              </td>
+              <td>
+                A throw completion representing the exception that occurred during evaluation. *undefined* if no exception occurred or if [[Status]] is not ~evaluated~.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <ins>[[ModuleSource]]</ins>
+              </td>
+              <td>
+                <ins>an Object or ~empty~</ins>
+              </td>
+              <td>
+                <ins>If this module has generated a module source object through GetModuleSource(), then this will be that object.</ins>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                [[DFSIndex]]
+              </td>
+              <td>
+                an integer or ~empty~
+              </td>
+              <td>
+                Auxiliary field used during Link and Evaluate only. If [[Status]] is ~linking~ or ~evaluating~, this non-negative number records the point at which the module was first visited during the depth-first traversal of the dependency graph.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                [[DFSAncestorIndex]]
+              </td>
+              <td>
+                an integer or ~empty~
+              </td>
+              <td>
+                Auxiliary field used during Link and Evaluate only. If [[Status]] is ~linking~ or ~evaluating~, this is either the module's own [[DFSIndex]] or that of an "earlier" module in the same strongly connected component.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                [[RequestedModules]]
+              </td>
+              <td>
+                a List of ModuleRequest Records
+              </td>
+              <td>
+                A List of all the |ModuleSpecifier| strings used by the module represented by this record to request the importation of a module, along with their associated phase (~source~ or ~evaluation~). The List is in source text occurrence order.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                [[CycleRoot]]
+              </td>
+              <td>
+                a Cyclic Module Record or ~empty~
+              </td>
+              <td>
+                The first visited module of the cycle, the root DFS ancestor of the strongly connected component. For a module not in a cycle this would be the module itself. Once Evaluate has completed, a module's [[DFSAncestorIndex]] is equal to the [[DFSIndex]] of its [[CycleRoot]].
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <ins>[[HasDynamicImport]]</ins>
+              </td>
+              <td>
+                <ins>a Boolean</ins>
+              </td>
+              <td>
+                <ins>Whether this module contains a dynamic `import()` or phased dynamic import expression.</ins>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <ins>[[HasImportMeta]]</ins>
+              </td>
+              <td>
+                <ins>a Boolean</ins>
+              </td>
+              <td>
+                <ins>Whether this module contains an `import.meta` expression.</ins>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                [[HasTLA]]
+              </td>
+              <td>
+                a Boolean
+              </td>
+              <td>
+                Whether this module is individually asynchronous (for example, if it's a Source Text Module Record containing a top-level await). Having an asynchronous dependency does not mean this field is *true*. This field must not change after the module is parsed.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                [[AsyncEvaluation]]
+              </td>
+              <td>
+                a Boolean
+              </td>
+              <td>
+                Whether this module is either itself asynchronous or has an asynchronous dependency. Note: The order in which this field is set is used to order queued executions, see <emu-xref href="#sec-async-module-execution-fulfilled"></emu-xref>.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                [[TopLevelCapability]]
+              </td>
+              <td>
+                a PromiseCapability Record or ~empty~
+              </td>
+              <td>
+                If this module is the [[CycleRoot]] of some cycle, and Evaluate() was called on some module in that cycle, this field contains the PromiseCapability Record for that entire evaluation. It is used to settle the Promise object that is returned from the Evaluate() abstract method. This field will be ~empty~ for any dependencies of that module, unless a top-level Evaluate() has been initiated for some of those dependencies.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                [[AsyncParentModules]]
+              </td>
+              <td>
+                a List of Cyclic Module Records
+              </td>
+              <td>
+                If this module or a dependency has [[HasTLA]] *true*, and execution is in progress, this tracks the parent importers of this module for the top-level execution job. These parent modules will not start executing before this module has successfully completed execution.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                [[PendingAsyncDependencies]]
+              </td>
+              <td>
+                an integer or ~empty~
+              </td>
+              <td>
+                If this module has any asynchronous dependencies, this tracks the number of asynchronous dependency modules remaining to execute for this module. A module with asynchronous dependencies will be executed when this field reaches 0 and there are no execution errors.
+              </td>
+            </tr>
+          </table>
+        </emu-table>
+
+        <emu-clause id="sec-modulegetimports" type="concrete method">
+          <h1><ins>GetImports ( ): an Array</ins></h1>
+          <dl class="header">
+            <dt>for</dt>
+            <dd>a Cyclic Module Record _module_</dd>
+
+            <dt>description</dt>
+            <dd></dd>
+          </dl>
+
+          <emu-alg>
+            1. Let _imports_ be a new empty List.
+            1. For each ModuleRequest Record _request_ of _module_.[[RequestedModules]], do
+              1. Let _import_ be OrdinaryObjectCreate(*null*).
+              1. Perform ! CreateDataPropertyOrThrow(_import_, *"specifier"*, _request_.[[Specifier]]).
+              1. Let _phase_ be _request_.[[Phase]].
+              1. Let _maybePhaseString_ be *null*.
+              1. If _phase_ is ~source~, then
+                1. Set _maybePhaseString_ to *"source"*.
+              1. Perform ! CreateDataPropertyOrThrow(_import_, *"phase"*, _maybePhaseString_).
+              1. Append _import_ to _imports_.
+            1. Return CreateArrayFromList(_imports_).
+          </emu-alg>
+        </emu-clause>
+      </emu-clause>
+
+      <emu-clause id="sec-source-text-module-records">
+        <h1>Source Text Module Records</h1>
+
+        <emu-clause id="sec-parsemodule" type="abstract operation">
+          <h1>
+            ParseModule (
+              _sourceText_: ECMAScript source text,
+              _realm_: a Realm Record,
+              _hostDefined_: anything,
+            ): a Source Text Module Record or a non-empty List of *SyntaxError* objects
+          </h1>
+          <dl class="header">
+            <dt>description</dt>
+            <dd>It creates a Source Text Module Record based upon the result of parsing _sourceText_ as a |Module|.</dd>
+          </dl>
+          <emu-alg>
+            1. Let _body_ be ParseText(_sourceText_, |Module|).
+            1. If _body_ is a List of errors, return _body_.
+            1. Let _requestedModules_ be the ModuleRequests of _body_.
+            1. Let _importEntries_ be ImportEntries of _body_.
+            1. Let _importedBoundNames_ be ImportedLocalNames(_importEntries_).
+            1. Let _indirectExportEntries_ be a new empty List.
+            1. Let _localExportEntries_ be a new empty List.
+            1. Let _starExportEntries_ be a new empty List.
+            1. Let _exportEntries_ be ExportEntries of _body_.
+            1. For each ExportEntry Record _ee_ of _exportEntries_, do
+              1. If _ee_.[[ModuleRequest]] is *null*, then
+                1. If _importedBoundNames_ does not contain _ee_.[[LocalName]], then
+                  1. Append _ee_ to _localExportEntries_.
+                1. Else,
+                  1. Let _ie_ be the element of _importEntries_ whose [[LocalName]] is _ee_.[[LocalName]].
+                  1. If _ie_.[[ImportName]] is ~namespace-object~, then
+                    1. NOTE: This is a re-export of an imported module namespace object.
+                    1. Append _ee_ to _localExportEntries_.
+                  1. Else,
+                    1. NOTE: This is a re-export of a single name.
+                    1. Append the ExportEntry Record { [[ModuleRequest]]: _ie_.[[ModuleRequest]], [[ImportName]]: _ie_.[[ImportName]], [[LocalName]]: *null*, [[ExportName]]: _ee_.[[ExportName]] } to _indirectExportEntries_.
+              1. Else if _ee_.[[ImportName]] is ~all-but-default~, then
+                1. Assert: _ee_.[[ExportName]] is *null*.
+                1. Append _ee_ to _starExportEntries_.
+              1. Else,
+                1. Append _ee_ to _indirectExportEntries_.
+            1. Let _async_ be _body_ Contains `await`.
+            1. <ins>Let _importMeta_ be _body_ Contains |ImportMeta|</ins>.
+            1. <ins>Let _dynamicImport_ be _body_ Contains |ImportCall|</ins>.
+            1. Return Source Text Module Record { [[Realm]]: _realm_, [[Environment]]: ~empty~, [[Namespace]]: ~empty~, [[ModuleSource]]: ~empty~, [[CycleRoot]]: ~empty~, <ins>[[HasDynamicImport]]: _dynamicImport_, [[HasImportMeta]]: _importMeta_, </ins>[[HasTLA]]: _async_, [[AsyncEvaluation]]: *false*, [[TopLevelCapability]]: ~empty~, [[AsyncParentModules]]: « », [[PendingAsyncDependencies]]: ~empty~, [[Status]]: ~new~, [[EvaluationError]]: ~empty~, [[HostDefined]]: _hostDefined_, [[ECMAScriptCode]]: _body_, [[Context]]: ~empty~, [[ImportMeta]]: ~empty~, [[RequestedModules]]: _requestedModules_, [[LoadedModules]]: « », [[ImportEntries]]: _importEntries_, [[LocalExportEntries]]: _localExportEntries_, [[IndirectExportEntries]]: _indirectExportEntries_, [[StarExportEntries]]: _starExportEntries_, [[DFSIndex]]: ~empty~, [[DFSAncestorIndex]]: ~empty~ }.
+          </emu-alg>
+          <emu-note>
+            <p>An implementation may parse module source text and analyse it for Early Error conditions prior to the evaluation of ParseModule for that module source text. However, the reporting of any errors must be deferred until the point where this specification actually performs ParseModule upon that source text.</p>
+          </emu-note>
+        </emu-clause>
+
+        <emu-clause id="sec-source-text-module-record-getmodulesource" type="concrete method">
+          <h1>
+              GetModuleSource ( ): either a normal completion containing an Object or a throw completion
+          </h1>
+          <dl class="header">
+            <dt>for</dt>
+            <dd>a Source Text Module Record _module_</dd>
+
+            <dt>description</dt>
+            <dd></dd>
+          </dl>
+          <emu-alg>
+            1. <del>Throw a *ReferenceError* exception.</del>
+            1. <ins>If _module_.[[ModuleSource]] is not ~empty~, then</ins>
+              1. <ins>Return _module_.[[ModuleSource]].</ins>
+            1. <ins>Let _moduleSource_ be OrdinaryObjectCreate(%ModuleSource.prototype%).</ins>
+            1. <ins>Set _moduleSource_.[[SourceTextModuleRecord]] to _module_.</ins>
+            1. <ins>Set _module_.[[ModuleSource]] to _moduleSource_.</ins>
+            1. <ins>Return _moduleSource_.</ins>
+          </emu-alg>
+        </emu-clause>
+      </emu-clause>
+
+      <emu-clause id="sec-HostGetModuleSourceName" type="host-defined abstract operation">
+        <h1>
+          <del>
+            HostGetModuleSourceName (
+              _moduleSource_: an Object,
+            ): either a normal completion containing a String or a throw completion
+          </del>
+        </h1>
+        <dl class="header">
+          <dt>description</dt>
+          <dd></dd>
+        </dl>
+
+        <p>An implementation of HostGetModuleSourceName must conform to the following requirements:</p>
+        <ul>
+          <li>
+            For any object that is a Module Source Object, returns a normal completion for a String corresponding to the source record type to be used as the strongly branded return value of the @@toStringTag getter on %AbstractModuleSource%.
+          </li>
+          <li>
+            For any object which is not a Module Source Object<ins>, or was not originally obtained through GetModuleSource</ins>, returns a throw completion.
+          </li>
+        </ul>
+      </emu-clause>
+
+      <emu-clause id="sec-HostGetModuleRecordFromSource" type="host-defined abstract operation">
+        <h1>
+          <ins>
+            HostGetModuleRecordFromSource (
+              _moduleSource_: an Object,
+            ): either a normal completion containing either a Module Record or ~not-a-source~, or a throw completion
+          </ins>
+        </h1>
+        <dl class="header">
+          <dt>description</dt>
+          <dd></dd>
+        </dl>
+
+        <p>An implementation of HostGetModuleRecordFromSource must conform to the following requirements:</p>
+        <ul>
+          <li>
+            For any object that is an instance of a concrete implementation of Abstract Module Source that was originally obtained through GetModuleSource, returns a normal completion for a concrete Module Record corresponding to the canonical module for this source.
+          </li>
+          <li>
+            For any ModuleSource Instance, this hook must always return the result of the GetModuleSourceSourceTextModuleRecord.
+          </li>
+          <li>
+            For any object which is a Module Source Object Instance, but was not originally obtained through GetModuleSource, returns a throw completion.
+          </li>
+          <li>
+            For any other object types, returns ~unused~ to indicate that the object is not a Module Source Object Instance.
+          </li>
+        </ul>
+      </emu-clause>
+    </emu-clause>
+  </emu-clause>
+</emu-clause>
+
+<emu-clause id="sec-reflection" number="28">
+  <h1>Reflection</h1>
+  <emu-clause id="sec-module-source-objects">
+    <h1>Module Source Objects</h1>
+    <p>Module Source Objects represent modules in their source import phase, which are not linked, instantiated or executed.</p>
+    <p>A <dfn>Module Source Object</dfn> is an object for which <del>HostGetModuleSourceName</del><ins>HostGetModuleRecordFromSource</ins> returns a normal completion.</p>
+    <p>All Module Source Objects should have a prototype of %AbstractModuleSource%.prototype.</p>
+    <p>Hosts may define their own %AbstractModuleSource% subclasses for custom module types.</p>
+
+    <emu-clause id="sec-%abstractmodulesource%-constructor">
+      <h1>The %AbstractModuleSource% Constructor</h1>
+      <p>The %AbstractModuleSource% constructor:</p>
+      <ul>
+        <li>along with its corresponding prototype object, provides common properties that are inherited by Module Source constructors and their instances.</li>
+        <li>does not have a global name or appear as a property of the global object.</li>
+        <li>acts as a common superclass of the constructors of Module Source Objects.</li>
+        <li>will throw an error when invoked, because it is an abstract class constructor. The module source constructors do not perform a `super` call to it.</li>
+      </ul>
+
+      <emu-clause id="sec-%abstractmodulesource%">
+        <h1>%AbstractModuleSource% ( )</h1>
+        <p>This function performs the following steps when called:</p>
+        <emu-alg>
+          1. Throw a *TypeError* exception.
+        </emu-alg>
+      </emu-clause>
+    </emu-clause>
+
+    <emu-clause id="sec-properties-of-the-%abstractmodulesource%-intrinsic-object">
+      <h1>Properties of the %AbstractModuleSource% Intrinsic Object</h1>
+      <p>The %AbstractModuleSource% intrinsic object:</p>
+      <ul>
+        <li>has a [[Prototype]] internal slot whose value is %Function.prototype%.</li>
+        <li>has a *"name"* property whose value is *"AbstractModuleSource"*.</li>
+        <li>has the following properties:</li>
+      </ul>
+
+      <emu-clause id="sec-%abstractmodulesource%.prototype">
+        <h1>%AbstractModuleSource%.prototype</h1>
+        <p>The initial value of %AbstractModuleSource%`.prototype` is the %AbstractModuleSource% prototype object.</p>
+        <p>This property has the attributes { [[Writable]]: *false*, [[Enumerable]]: *false*, [[Configurable]]: *false* }.</p>
+      </emu-clause>
+    </emu-clause>
+
+    <emu-clause id="sec-properties-of-the-%abstractmodulesource%-prototype-object">
+      <h1>Properties of the %AbstractModuleSource% Prototype Object</h1>
+      <p>The <dfn>%AbstractModuleSource% prototype object</dfn>:</p>
+      <ul>
+        <li>has a [[Prototype]] internal slot whose value is %Object.prototype%.</li>
+        <li>is <dfn>%AbstractModuleSource.prototype%</dfn>.</li>
+        <li>is an ordinary object.</li>
+        <li>has the following properties:</li>
+      </ul>
+
+      <emu-clause id="sec-%abstractmodulesource%.prototype.constructor">
+        <h1>%AbstractModuleSource%.prototype.constructor</h1>
+        <p>The initial value of %AbstractModuleSource%`.prototype.constructor` is %AbstractModuleSource%.</p>
+      </emu-clause>
+
+      <emu-clause id="sec-get-%abstractmodulesource%.prototype.@@tostringtag">
+        <h1>get %AbstractModuleSource%.prototype [ @@toStringTag ]</h1>
+        <p>%AbstractModuleSource%.prototype `[@@toStringTag]` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
+        <emu-alg>
+          1. Let _O_ be the *this* value.
+          1. If _O_ is not an Object, return *undefined*.
+          1. <del>Let _sourceNameResult_ be Completion(HostGetModuleSourceName(_O_)).</del>
+          1. <del>If _sourceNameResult_ is an abrupt completion, return *undefined*.</del>
+          1. <del>Let _name_ be ! _sourceNameResult_.</del>
+          1. <ins>Let _moduleResult_ be Completion(HostGetModuleRecordFromSource(_O_)).</ins>
+          1. <ins>If _moduleResult_ is an abrupt completion, return *undefined*.</ins>
+          1. <ins>Let _module_ be ! _moduleResult_.</ins>
+          1. <ins>If _module_ is ~not-a-source~, return *undefined*.</ins>
+          1. <ins>Let _name_ be _module_.GetModuleSourceName().</ins>
+          1. Assert: _name_ is a String.
+          1. Return _name_.
+        </emu-alg>
+        <p>This property has the attributes { [[Enumerable]]: *false*, [[Configurable]]: *true* }.</p>
+        <p>The initial value of the *"name"* property of this function is *"get [Symbol.toStringTag]"*.</p>
+      </emu-clause>
+
+      <emu-clause id="sec-%abstractmodulesource%.prototype.imports">
+        <h1><ins>%AbstractModuleSource%.prototype.imports ( )</ins></h1>
+        <p>This method performs the following steps when called:</p>
+        <emu-alg>
+          1. Let _M_ be the *this* value.
+          1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
+          1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
+          1. Assert: _module_ is a Cyclic Module Record.
+          1. Return _module_.GetImports().
+        </emu-alg>
+      </emu-clause>
+
+      <emu-clause id="sec-%abstractmodulesource%.prototype.hasDynamicImport">
+        <h1><ins>get AbstractModuleSource.prototype.hasDynamicImport</ins></h1>
+        <p>`AbstractModuleSource.prototype.hasDynamicImport` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
+        <emu-alg>
+          1. Let _M_ be the *this* value.
+          1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
+          1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
+          1. Assert: _module_ is a Cyclic Module Record.
+          1. Return _module_.[[HasDynamicImport]].
+        </emu-alg>
+      </emu-clause>
+
+      <emu-clause id="sec-%abstractmodulesource%.prototype.hasImportMeta">
+        <h1><ins>get AbstractModuleSource.prototype.hasImportMeta</ins></h1>
+        <p>`AbstractModuleSource.prototype.hasImportMeta` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
+        <emu-alg>
+          1. Let _M_ be the *this* value.
+          1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
+          1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
+          1. Assert: _module_ is a Cyclic Module Record.
+          1. Return _module_.[[HasImportMeta]].
+        </emu-alg>
+      </emu-clause>
+
+      <emu-clause id="sec-%abstractmodulesource%.prototype.hasTopLevelAwait">
+        <h1><ins>get AbstractModuleSource.prototype.hasTopLevelAwait</ins></h1>
+        <p>`AbstractModuleSource.prototype.hasTopLevelAwait` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
+        <emu-alg>
+          1. Let _M_ be the *this* value.
+          1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
+          1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
+          1. Assert: _module_ is a Cyclic Module Record.
+          1. Return _module_.[[HasTLA]].
+        </emu-alg>
+      </emu-clause>
+    </emu-clause>
+
+    <emu-clause id="sec-module-source-object">
+      <h1><ins>The %ModuleSource% Constructor</ins></h1>
+      <p>The %ModuleSource% constructor:</p>
+      <ul>
+        <li>does not have a global name or appear as a property of the global object.</li>
+        <li>will throw an error when invoked, where support for dynamic construction may be added in future.</li>
+      </ul>
+
+      <emu-clause id="sec-%modulesource%">
+        <h1>%ModuleSource% ( )</h1>
+        <p>This function performs the following steps when called:</p>
+        <emu-alg>
+          1. Throw a *TypeError* exception.
+        </emu-alg>
+      </emu-clause>
+    </emu-clause>
+
+    <emu-clause id="sec-properties-of-the-%modulesource%-prototype-object">
+      <h1><ins>Properties of the %ModuleSource% Prototype Object</ins></h1>
+      <p>The <dfn>%ModuleSource% prototype object</dfn>:</p>
+      <ul>
+        <li>has a [[Prototype]] internal slot whose value is %AbstractModuleSource.prototype%.</li>
+        <li>is <dfn>%ModuleSource.prototype%</dfn>.</li>
+        <li>is an ordinary object.</li>
+        <li>has the following properties:</li>
+      </ul>
+
+      <emu-clause id="sec-%modulesource%.prototype.constructor">
+        <h1><ins>%ModuleSource%.prototype.constructor</ins></h1>
+        <p>The initial value of %ModuleSource%`.prototype.constructor` is %ModuleSource%.</p>
+      </emu-clause>
+    </emu-clause>
+
+    <emu-clause id="sec-properties-of-modulesource-instances">
+      <h1><ins>Properties of ModuleSource Instances</ins></h1>
+      <p>ModuleSource instances are ordinary objects that inherit properties from the %ModuleSource% prototype object.</p>
+      <p>ModuleSource instances have a [[SourceTextModuleRecord]] internal slot.</p>
+    </emu-clause>
+
+    <emu-clause id="sec-abstract-operations-for-modulesource-objects">
+      <h1><ins>Abstract Operations for ModuleSource Objects</ins></h1>
+
+      <emu-clause id="sec-getmodulesourcesourcetextmodulerecord" type="abstract operation">
+        <h1>
+          GetModuleSourceSourceTextModuleRecord (
+            _M_: a ModuleSource Instance
+          ): either a normal completion containing a Source Text Module Record, or a throw completion
+        </h1>
+        <dl class="header">
+        </dl>
+        <emu-alg>
+          1. Perform ? RequireInternalSlot(_M_, [[SourceTextModuleRecord]]).
+          1. Return _M_.[[SourceTextModuleRecord]].
+        </emu-alg>
+        <emu-note>
+          <p>This abstract operation is the required implementation of HostGetModuleRecordFromSource for any object which is a ModuleSource Instance.</p>
+        </emu-note>
+      </emu-clause>
+    </emu-clause>
+  </emu-clause>
+</emu-clause>
+
+<emu-annex id="sec-host-layering-points">
+  <h1>Host Layering Points</h1>
+
+  <emu-annex id="sec-host-hooks-summary">
+    <h1>Host Hooks</h1>
+    <p><b>HostCallJobCallback(...)</b></p>
+    <p><b>HostEnqueueFinalizationRegistryCleanupJob(...)</b></p>
+    <p><b>HostEnqueueGenericJob(...)</b></p>
+    <p><b>HostEnqueuePromiseJob(...)</b></p>
+    <p><b>HostEnqueueTimeoutJob(...)</b></p>
+    <p><b>HostEnsureCanCompileStrings(...)</b></p>
+    <p><b>HostFinalizeImportMeta(...)</b></p>
+    <p><b>HostGetImportMetaProperties(...)</b></p>
+    <p><b><del>HostGetModuleSourceName</del><ins>HostGetModuleRecordFromSource</ins>(...)</b></p>
+    <p><b>HostGrowSharedArrayBuffer(...)</b></p>
+    <p><b>HostHasSourceTextAvailable(...)</b></p>
+    <p><b>HostLoadImportedModule(...)</b></p>
+    <p><b>HostMakeJobCallback(...)</b></p>
+    <p><b>HostPromiseRejectionTracker(...)</b></p>
+    <p><b>HostResizeArrayBuffer(...)</b></p>
+    <p><b>InitializeHostDefinedRealm(...)</b></p>
+  </emu-annex>
+</emu-annex>
