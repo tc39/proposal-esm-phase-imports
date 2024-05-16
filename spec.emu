@@ -1460,7 +1460,7 @@ contributors: Luca Casonato, Guy Bedford
             For any object that is a Module Source Object, returns a normal completion for a String corresponding to the source record type to be used as the strongly branded return value of the @@toStringTag getter on %AbstractModuleSource%.
           </li>
           <li>
-            For any object which is not a Module Source Object<ins>, or was not originally obtained through GetModuleSource</ins>, returns a throw completion.
+            For any object which is not a Module Source Object, returns a throw completion.
           </li>
         </ul>
       </emu-clause>
@@ -1659,13 +1659,9 @@ contributors: Luca Casonato, Guy Bedford
           1. Let _starExports_ be a new empty List.
           1. Let _starExportRequests_ be ! _module_.GetStarExports().
           1. For each ModuleRequest _request_ in _starExportRequests_, do
+            1. Assert: _request_.[[Phase]] is ~instance~.
             1. Let _starExport_ be OrdinaryObjectCreate(*null*).
             1. Perform ! CreateDataPropertyOrThrow(_starExport_, *"specifier"*, _request_.[[Specifier]]).
-            1. Let _phase_ be _request_.[[Phase]].
-            1. Let _maybePhaseString_ be *null*.
-            1. If _phase_ is ~source~, then
-              1. Set _maybePhaseString_ to *"source"*.
-            1. Perform ! CreateDataPropertyOrThrow(_starExport_, *"phase"*, _maybePhaseString_).
             1. Append _starExport_ to _starExports_.
           1. Return CreateArrayFromList(_starExports_).
         </emu-alg>
