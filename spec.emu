@@ -1010,6 +1010,15 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
+                Link()
+              </td>
+              <td>
+                <p>Prepare the module for evaluation by transitively resolving all module dependencies and creating a Module Environment Record.</p>
+                <p>LoadRequestedModules must have completed successfully prior to invoking this method.</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
                 <del>GetExportedNames([_exportStarSet_])</del>
               </td>
               <td>
@@ -1027,6 +1036,15 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
+                Evaluate()
+              </td>
+              <td>
+                <p>Returns a promise for the evaluation of this module and its dependencies, resolving on successful evaluation or if it has already been evaluated successfully, and rejecting for an evaluation error or if it has already been evaluated unsuccessfully. If the promise is rejected, hosts are expected to handle the promise rejection and rethrow the evaluation error.</p>
+                <p>Link must have completed successfully prior to invoking this method.</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
                 ResolveExport(_exportName_ [, _resolveSet_])
               </td>
               <td>
@@ -1037,44 +1055,18 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
-                Link()
-              </td>
-              <td>
-                <p>Prepare the module for evaluation by transitively resolving all module dependencies and creating a Module Environment Record.</p>
-                <p>LoadRequestedModules must have completed successfully prior to invoking this method.</p>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                Evaluate()
-              </td>
-              <td>
-                <p>Returns a promise for the evaluation of this module and its dependencies, resolving on successful evaluation or if it has already been evaluated successfully, and rejecting for an evaluation error or if it has already been evaluated unsuccessfully. If the promise is rejected, hosts are expected to handle the promise rejection and rethrow the evaluation error.</p>
-                <p>Link must have completed successfully prior to invoking this method.</p>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <ins>GetImports()</ins>
-              </td>
-              <td>
-                <p><ins>Returns an Array representation of the imports of the module record.</ins></p>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <ins>GetStarExportedModules()</ins>
-              </td>
-              <td>
-                <p><ins>Returns a List of ModuleRequest Records for the star reexports of the module.</ins></p>
-              </td>
-            </tr>
-            <tr>
-              <td>
                 <ins>GetExplicitExportedNames()</ins>
               </td>
               <td>
-                <p><ins>Return a list of all names that are directly exported from this module.</ins></p>
+                <p><ins>Return a list of all names that are explicitly exported directly or indirectly from this module.</ins></p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <ins>GetStarExports()</ins>
+              </td>
+              <td>
+                <p><ins>Returns a list of ModuleRequest Records for the star exports of the module.</ins></p>
               </td>
             </tr>
             <tr>
@@ -1276,29 +1268,34 @@ contributors: Luca Casonato, Guy Bedford
           </table>
         </emu-table>
 
-        <emu-clause id="sec-modulegetimports" type="concrete method">
-          <h1><ins>GetImports ( ): an Array</ins></h1>
+        <emu-clause id="sec-populateexportstarset" type="concrete method">
+          <h1>
+            <ins>
+              PopulateExportStarSet (
+                optional _exportStarSet_: a List of <del>Source Text</del>Cyclic Module Records,
+              ): a List of Strings
+            </ins>
+          </h1>
           <dl class="header">
             <dt>for</dt>
-            <dd>a Cyclic Module Record _module_</dd>
-
-            <dt>description</dt>
-            <dd></dd>
+            <dd>a Source Text Module Record _module_</dd>
           </dl>
-
           <emu-alg>
-            1. Let _imports_ be a new empty List.
-            1. For each ModuleRequest Record _request_ of _module_.[[RequestedModules]], do
-              1. Let _import_ be OrdinaryObjectCreate(*null*).
-              1. Perform ! CreateDataPropertyOrThrow(_import_, *"specifier"*, _request_.[[Specifier]]).
-              1. Let _phase_ be _request_.[[Phase]].
-              1. Let _maybePhaseString_ be *null*.
-              1. If _phase_ is ~source~, then
-                1. Set _maybePhaseString_ to *"source"*.
-              1. Perform ! CreateDataPropertyOrThrow(_import_, *"phase"*, _maybePhaseString_).
-              1. Append _import_ to _imports_.
-            1. Return CreateArrayFromList(_imports_).
+            1. Assert: _module_.[[Status]] is not ~new~.
+            1. If _exportStarSet_ is not present, set _exportStarSet_ to a new empty List.
+            1. If _exportStarSet_ contains _module_, then
+              1. Assert: We've reached the starting point of an `export *` circularity.
+              1. Return a new empty List.
+            1. Append _module_ to _exportStarSet_.
+            1. Let _starExportRequests_ be ! _module_.GetStarExports().
+            1. For each ModuleRequest _request_ of _starExportRequests_, do
+              1. Let _requestedModule_ be GetImportedModule(_module_, _request_).
+              1. Perform ! _requestedModule_.PopulateExportStarSet(_exportStarSet_).
+            1. Return _exportStarSet_.
           </emu-alg>
+          <emu-note>
+            <p>GetExportedNames does not filter out or throw an exception for names that have ambiguous star export bindings.</p>
+          </emu-note>
         </emu-clause>
       </emu-clause>
 
@@ -1402,12 +1399,10 @@ contributors: Luca Casonato, Guy Bedford
           </emu-note>
         </emu-clause>
 
-        <emu-clause id="sec-populateexportstarset" type="concrete method">
+        <emu-clause id="sec-getstarexports" type="concrete method">
           <h1>
             <ins>
-              PopulateExportStarSet (
-                optional _exportStarSet_: a List of <del>Source Text</del>Module Records,
-              ): a List of Strings
+              GetStarExports ( ): a List of ModuleRequests
             </ins>
           </h1>
           <dl class="header">
@@ -1415,21 +1410,12 @@ contributors: Luca Casonato, Guy Bedford
             <dd>a Source Text Module Record _module_</dd>
           </dl>
           <emu-alg>
-            1. Assert: _module_.[[Status]] is not ~new~.
-            1. If _exportStarSet_ is not present, set _exportStarSet_ to a new empty List.
-            1. If _exportStarSet_ contains _module_, then
-              1. Assert: We've reached the starting point of an `export *` circularity.
-              1. Return a new empty List.
-            1. Append _module_ to _exportStarSet_.
+            1. Let _exportStarRequests_ be a new empty List.
             1. For each ExportEntry Record _e_ of _module_.[[StarExportEntries]], do
               1. Assert: _e_.[[ModuleRequest]] is not *null*.
-              1. Let _requestedModule_ be GetImportedModule(_module_, _e_.[[ModuleRequest]]).
-              1. Perform ! _requestedModule_.PopulateExportStarSet(_exportStarSet_).
-            1. Return _exportStarSet_.
+              1. Append _e_.[[ModuleRequest]] to _exportStarRequests_.
+            1. Return _exportStarRequests.
           </emu-alg>
-          <emu-note>
-            <p>GetExportedNames does not filter out or throw an exception for names that have ambiguous star export bindings.</p>
-          </emu-note>
         </emu-clause>
 
         <emu-clause id="sec-source-text-module-record-getmodulesource" type="concrete method">
@@ -1635,20 +1621,30 @@ contributors: Luca Casonato, Guy Bedford
           1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
           1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
           1. Assert: _module_ is a Cyclic Module Record.
-          1. Return _module_.GetImports().
+          1. Let _imports_ be a new empty List.
+          1. For each ModuleRequest Record _request_ of _module_.[[RequestedModules]], do
+            1. Let _import_ be OrdinaryObjectCreate(*null*).
+            1. Perform ! CreateDataPropertyOrThrow(_import_, *"specifier"*, _request_.[[Specifier]]).
+            1. Let _phase_ be _request_.[[Phase]].
+            1. Let _maybePhaseString_ be *null*.
+            1. If _phase_ is ~source~, then
+              1. Set _maybePhaseString_ to *"source"*.
+            1. Perform ! CreateDataPropertyOrThrow(_import_, *"phase"*, _maybePhaseString_).
+            1. Append _import_ to _imports_.
+          1. Return CreateArrayFromList(_imports_).
         </emu-alg>
       </emu-clause>
 
-      <emu-clause id="sec-%abstractmodulesource%.prototype.explicitExports">
-        <h1><ins>%AbstractModuleSource%.prototype.explicitExports ( )</ins></h1>
+      <emu-clause id="sec-%abstractmodulesource%.prototype.namedExports">
+        <h1><ins>%AbstractModuleSource%.prototype.namedExports ( )</ins></h1>
         <p>This method performs the following steps when called:</p>
         <emu-alg>
           1. Let _M_ be the *this* value.
           1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
           1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
           1. Assert: _module_ is a Cyclic Module Record.
-          1. Let _directExportedNames_ be ! _module_.GetExplicitExportedNames().
-          1. Return CreateArrayFromList(_directExportedNames_).
+          1. Let _exportedNames_ be ! _module_.GetExplicitExportedNames().
+          1. Return CreateArrayFromList(_exportedNames_).
         </emu-alg>
       </emu-clause>
 
@@ -1660,8 +1656,18 @@ contributors: Luca Casonato, Guy Bedford
           1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
           1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
           1. Assert: _module_ is a Cyclic Module Record.
-          1. Let _directExportedNames_ be ! _module_.GetExplicitExportedNames().
-          1. Return CreateArrayFromList(_directExportedNames_).
+          1. Let _starExports_ be a new empty List.
+          1. Let _starExportRequests_ be ! _module_.GetStarExports().
+          1. For each ModuleRequest _request_ in _starExportRequests_, do
+            1. Let _starExport_ be OrdinaryObjectCreate(*null*).
+            1. Perform ! CreateDataPropertyOrThrow(_starExport_, *"specifier"*, _request_.[[Specifier]]).
+            1. Let _phase_ be _request_.[[Phase]].
+            1. Let _maybePhaseString_ be *null*.
+            1. If _phase_ is ~source~, then
+              1. Set _maybePhaseString_ to *"source"*.
+            1. Perform ! CreateDataPropertyOrThrow(_starExport_, *"phase"*, _maybePhaseString_).
+            1. Append _starExport_ to _starExports_.
+          1. Return CreateArrayFromList(_starExports_).
         </emu-alg>
       </emu-clause>
 

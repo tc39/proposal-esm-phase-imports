@@ -134,17 +134,13 @@ interface Import {
 }
 ```
 
-### `AbstractModuleSource.prototype.directExports()`
+### `AbstractModuleSource.prototype.namedExports()`
 
-Returns a list of the direct export names of the module of the form `String[]`.
-
-### `AbstractModuleSource.prototype.starExports()`
-
-Returns a list of the imports which are star re-exported, of the form `Import[]`.
+Returns a list of the explicit named exports of the module of the form `String[]`.
 
 ### `AbstractModuleSource.prototype.starExports()`
 
-Returns a list of the star exports of the module of the form `Import[]` as defined in `imports()`.
+Returns a list of the imports which are star exported, of the form `Import[]`.
 
 ### `AbstractModuleSource.prototype.hasDynamicImport`
 
