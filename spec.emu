@@ -1019,14 +1019,6 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
-                <ins>GetDirectExportedNames()</ins>
-              </td>
-              <td>
-                <p><ins>Return a list of all names that are directly exported from this module.</ins></p>
-              </td>
-            </tr>
-            <tr>
-              <td>
                 <ins>PopulateExportStarSet([_exportStarSet_])</ins>
               </td>
               <td>
@@ -1063,6 +1055,30 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
+                <ins>GetImports()</ins>
+              </td>
+              <td>
+                <p><ins>Returns an Array representation of the imports of the module record.</ins></p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <ins>GetStarExportedModules()</ins>
+              </td>
+              <td>
+                <p><ins>Returns a List of ModuleRequest Records for the star reexports of the module.</ins></p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <ins>GetExplicitExportedNames()</ins>
+              </td>
+              <td>
+                <p><ins>Return a list of all names that are directly exported from this module.</ins></p>
+              </td>
+            </tr>
+            <tr>
+              <td>
                 GetModuleSource()
               </td>
               <td>
@@ -1079,14 +1095,6 @@ contributors: Luca Casonato, Guy Bedford
               <td>
                 <p><ins>For Module Records that implement a normal completion for GetModuleSource(), returns a constant String for each concrete module record that exposes a source representation through `GetModuleSource()`, to be provided in the strongly branded return value of the @@toStringTag getter on %AbstractModuleSource%.</ins></p>
                 <p><ins>For Module Records that do not have a source representation, GetModuleSourceName() is never called.</ins></p>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <ins>GetImports()</ins>
-              </td>
-              <td>
-                <p><ins>Returns an Array representation of the imports of the module record.</ins></p>
               </td>
             </tr>
           </table>
@@ -1346,7 +1354,7 @@ contributors: Luca Casonato, Guy Bedford
           </emu-note>
         </emu-clause>
 
-        <emu-clause id="sec-getdirectexportednames" type="concrete method">
+        <emu-clause id="sec-getexplicitexportednames" type="concrete method">
           <h1>
             <del>
               GetExportedNames (
@@ -1356,7 +1364,7 @@ contributors: Luca Casonato, Guy Bedford
           </h1>
           <h1>
             <ins>
-              GetDirectExportedNames ( ): a List of Strings
+              GetExplicitExportedNames ( ): a List of Strings
             </ins>
           </h1>
           <dl class="header">
@@ -1390,7 +1398,7 @@ contributors: Luca Casonato, Guy Bedford
             1. Return _exportedNames_.
           </emu-alg>
           <emu-note>
-            <p><del>GetExportedNames</del><ins>GetDirectExportedNames</ins> does not filter out or throw an exception for names that have ambiguous star export bindings.</p>
+            <p><del>GetExportedNames</del><ins>GetExplicitExportedNames</ins> does not filter out or throw an exception for names that have ambiguous star export bindings.</p>
           </emu-note>
         </emu-clause>
 
@@ -1516,10 +1524,10 @@ contributors: Luca Casonato, Guy Bedford
           1. Assert: If _module_ is a Cyclic Module Record, then _module_.[[Status]] is not ~new~ or ~unlinked~.
           1. Let _namespace_ be _module_.[[Namespace]].
           1. If _namespace_ is ~empty~, then
-            1. Let _exportedNames_ be <del>_module_.GetExportedNames()</del><ins>_module_.GetDirectExportedNames()</ins>.
+            1. Let _exportedNames_ be <del>_module_.GetExportedNames()</del><ins>_module_.GetExplicitExportedNames()</ins>.
             1. <ins>Let _exportStarSet_ be _module_.PopulateExportStarSet().</ins>
             1. <ins>For each element _exportStarModule_ of _exportStarSet_, do</ins>
-              1. <ins>Let _starNames_ be _exportStarModule_.GetDirectExportedNames().</ins>
+              1. <ins>Let _starNames_ be _exportStarModule_.GetExplicitExportedNames().</ins>
               1. <ins>For each element _n_ of _starNames_, do</ins>
                 1. <ins>If _n_ is not *"default"*, then</ins>
                   1. <ins>If _exportedNames_ does not contain _n_, then</ins>
@@ -1631,15 +1639,28 @@ contributors: Luca Casonato, Guy Bedford
         </emu-alg>
       </emu-clause>
 
-      <emu-clause id="sec-%abstractmodulesource%.prototype.directExports">
-        <h1><ins>%AbstractModuleSource%.prototype.directExports ( )</ins></h1>
+      <emu-clause id="sec-%abstractmodulesource%.prototype.explicitExports">
+        <h1><ins>%AbstractModuleSource%.prototype.explicitExports ( )</ins></h1>
         <p>This method performs the following steps when called:</p>
         <emu-alg>
           1. Let _M_ be the *this* value.
           1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
           1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
           1. Assert: _module_ is a Cyclic Module Record.
-          1. Let _directExportedNames_ be ! _module_.GetDirectExportedNames().
+          1. Let _directExportedNames_ be ! _module_.GetExplicitExportedNames().
+          1. Return CreateArrayFromList(_directExportedNames_).
+        </emu-alg>
+      </emu-clause>
+
+      <emu-clause id="sec-%abstractmodulesource%.prototype.starExports">
+        <h1><ins>%AbstractModuleSource%.prototype.starExports ( )</ins></h1>
+        <p>This method performs the following steps when called:</p>
+        <emu-alg>
+          1. Let _M_ be the *this* value.
+          1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
+          1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
+          1. Assert: _module_ is a Cyclic Module Record.
+          1. Let _directExportedNames_ be ! _module_.GetExplicitExportedNames().
           1. Return CreateArrayFromList(_directExportedNames_).
         </emu-alg>
       </emu-clause>
