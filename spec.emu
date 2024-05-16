@@ -1278,7 +1278,7 @@ contributors: Luca Casonato, Guy Bedford
           </h1>
           <dl class="header">
             <dt>for</dt>
-            <dd>a Source Text Module Record _module_</dd>
+            <dd>a Cyclic Module Record _module_</dd>
           </dl>
           <emu-alg>
             1. Assert: _module_.[[Status]] is not ~new~.
