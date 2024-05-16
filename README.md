@@ -134,6 +134,10 @@ interface Import {
 }
 ```
 
+### `AbstractModuleSource.prototype.directExports()`
+
+Returns a list of the direct export name `String` of the module of the form `String[]`.
+
 ### `AbstractModuleSource.prototype.hasDynamicImport`
 
 A boolean getter property indicating if the module may call dynamic import.
