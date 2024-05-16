@@ -1294,7 +1294,7 @@ contributors: Luca Casonato, Guy Bedford
             1. Return _exportStarSet_.
           </emu-alg>
           <emu-note>
-            <p>GetExportedNames does not filter out or throw an exception for names that have ambiguous star export bindings.</p>
+            <p>PopulateExportStarSet does not filter out or throw an exception for names that have ambiguous star export bindings.</p>
           </emu-note>
         </emu-clause>
       </emu-clause>
