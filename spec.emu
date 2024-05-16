@@ -1027,7 +1027,7 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
-                <ins>GetExportStarSet([_exportStarSet_])</ins>
+                <ins>PopulateExportStarSet([_exportStarSet_])</ins>
               </td>
               <td>
                 <p><ins>Return a list of the modules that are directly or indirectly star exported.</ins></p>
@@ -1394,10 +1394,10 @@ contributors: Luca Casonato, Guy Bedford
           </emu-note>
         </emu-clause>
 
-        <emu-clause id="sec-getexportstarset" type="concrete method">
+        <emu-clause id="sec-populateexportstarset" type="concrete method">
           <h1>
             <ins>
-              GetExportStarSet (
+              PopulateExportStarSet (
                 optional _exportStarSet_: a List of <del>Source Text</del>Module Records,
               ): a List of Strings
             </ins>
@@ -1416,7 +1416,7 @@ contributors: Luca Casonato, Guy Bedford
             1. For each ExportEntry Record _e_ of _module_.[[StarExportEntries]], do
               1. Assert: _e_.[[ModuleRequest]] is not *null*.
               1. Let _requestedModule_ be GetImportedModule(_module_, _e_.[[ModuleRequest]]).
-              1. Perform ! _requestedModule_.GetExportStarSet(_exportStarSet_).
+              1. Perform ! _requestedModule_.PopulateExportStarSet(_exportStarSet_).
             1. Return _exportStarSet_.
           </emu-alg>
           <emu-note>
@@ -1517,7 +1517,7 @@ contributors: Luca Casonato, Guy Bedford
           1. Let _namespace_ be _module_.[[Namespace]].
           1. If _namespace_ is ~empty~, then
             1. Let _exportedNames_ be <del>_module_.GetExportedNames()</del><ins>_module_.GetDirectExportedNames()</ins>.
-            1. <ins>Let _exportStarSet_ be _module_.GetExportStarSet().</ins>
+            1. <ins>Let _exportStarSet_ be _module_.PopulateExportStarSet().</ins>
             1. <ins>For each element _exportStarModule_ of _exportStarSet_, do</ins>
               1. <ins>Let _starNames_ be _exportStarModule_.GetDirectExportedNames().</ins>
               1. <ins>For each element _n_ of _starNames_, do</ins>
