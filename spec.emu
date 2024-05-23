@@ -1394,7 +1394,7 @@ contributors: Luca Casonato, Guy Bedford
             1. For each ExportEntry Record _e_ of _module_.[[StarExportEntries]], do
               1. Assert: _e_.[[ModuleRequest]] is not *null*.
               1. Append _e_.[[ModuleRequest]] to _exportStarRequests_.
-            1. Return _exportStarRequests.
+            1. Return _exportStarRequests_.
           </emu-alg>
         </emu-clause>
 
