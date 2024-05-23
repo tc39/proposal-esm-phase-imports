@@ -178,12 +178,12 @@ interface Import {
 
 Returns a list of the explicit named exports of the module of the form `String[]`.
 
-### `AbstractModuleSource.prototype.starExports()`
+### `AbstractModuleSource.prototype.namespaceReexports()`
 
-Returns a list of the imports which are star exported, of the form `ImportStar[]` defined by:
+Returns a list of the imported modules whose namespaces are reexported, of the form `NamespaceReexport[]` defined by:
 
 ```ts
-interface ImportStar {
+interface NamespaceReexport {
   specifier: string
 }
 ```

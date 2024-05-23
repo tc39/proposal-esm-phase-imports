@@ -1055,7 +1055,7 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
-                <ins>GetStarExports()</ins>
+                <ins>GetNamespaceReexports()</ins>
               </td>
               <td>
                 <p><ins>Returns a list of ModuleRequest Records for the star exports of the module.</ins></p>
@@ -1084,10 +1084,10 @@ contributors: Luca Casonato, Guy Bedford
           </table>
         </emu-table>
 
-        <emu-clause id="sec-getstarexports" type="concrete method">
+        <emu-clause id="sec-getnamespacereexports" type="concrete method">
           <h1>
             <ins>
-              GetStarExports ( ): a List of Module Requests
+              GetNamespaceReexports ( ): a List of Module Requests
             </ins>
           </h1>
           <dl class="header">
@@ -1098,7 +1098,7 @@ contributors: Luca Casonato, Guy Bedford
             1. Return a new empty List.
           </emu-alg>
           <emu-note>
-            <p>The default implementation of GetStarExports returns an empty list, while concrete Module Records may override this definition.</p>
+            <p>The default implementation of GetNamespaceReexports returns an empty list, while concrete Module Records may override this definition.</p>
           </emu-note>
         </emu-clause>
       </emu-clause>
@@ -1379,10 +1379,10 @@ contributors: Luca Casonato, Guy Bedford
           </emu-note>
         </emu-clause>
 
-        <emu-clause id="sec-source-text-module-record-getstarexports" type="concrete method">
+        <emu-clause id="sec-source-text-module-record-getnamespacereexports" type="concrete method">
           <h1>
             <ins>
-              GetStarExports ( ): a List of ModuleRequests
+              GetNamespaceReexports ( ): a List of ModuleRequests
             </ins>
           </h1>
           <dl class="header">
@@ -1390,11 +1390,11 @@ contributors: Luca Casonato, Guy Bedford
             <dd>a Source Text Module Record _module_</dd>
           </dl>
           <emu-alg>
-            1. Let _exportStarRequests_ be a new empty List.
+            1. Let _namespaceReexports_ be a new empty List.
             1. For each ExportEntry Record _e_ of _module_.[[StarExportEntries]], do
               1. Assert: _e_.[[ModuleRequest]] is not *null*.
-              1. Append _e_.[[ModuleRequest]] to _exportStarRequests_.
-            1. Return _exportStarRequests_.
+              1. Append _e_.[[ModuleRequest]] to _namespaceReexports_.
+            1. Return _namespaceReexports_.
           </emu-alg>
         </emu-clause>
 
@@ -1529,7 +1529,7 @@ contributors: Luca Casonato, Guy Bedford
               1. Assert: We've reached the starting point of an `export *` circularity.
               1. Return a new empty List.
             1. Append _module_ to _exportStarSet_.
-            1. Let _starExportRequests_ be ! _module_.GetStarExports().
+            1. Let _starExportRequests_ be ! _module_.GetNamespaceReexports().
             1. For each ModuleRequest _request_ of _starExportRequests_, do
               1. Let _requestedModule_ be GetImportedModule(_module_, _request_).
               1. Perform PopulateExportStarSet(_requestedModule_, _exportStarSet_).
@@ -1659,8 +1659,8 @@ contributors: Luca Casonato, Guy Bedford
         </emu-alg>
       </emu-clause>
 
-      <emu-clause id="sec-%abstractmodulesource%.prototype.starExports">
-        <h1><ins>%AbstractModuleSource%.prototype.starExports ( )</ins></h1>
+      <emu-clause id="sec-%abstractmodulesource%.prototype.namespaceReexports">
+        <h1><ins>%AbstractModuleSource%.prototype.namespaceReexports ( )</ins></h1>
         <p>This method performs the following steps when called:</p>
         <emu-alg>
           1. Let _M_ be the *this* value.
@@ -1668,7 +1668,7 @@ contributors: Luca Casonato, Guy Bedford
           1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
           1. Assert: _module_ is a Cyclic Module Record.
           1. Let _starExports_ be a new empty List.
-          1. Let _starExportRequests_ be ! _module_.GetStarExports().
+          1. Let _starExportRequests_ be ! _module_.GetNamespaceReexports().
           1. For each ModuleRequest _request_ in _starExportRequests_, do
             1. Assert: _request_.[[Phase]] is ~instance~.
             1. Let _starExport_ be OrdinaryObjectCreate(*null*).
