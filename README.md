@@ -134,6 +134,20 @@ interface Import {
 }
 ```
 
+### `AbstractModuleSource.prototype.namedExports()`
+
+Returns a list of the explicit named exports of the module of the form `String[]`.
+
+### `AbstractModuleSource.prototype.starExports()`
+
+Returns a list of the imports which are star exported, of the form `ImportStar[]` defined by:
+
+```ts
+interface ImportStar {
+  specifier: string
+}
+```
+
 ### `AbstractModuleSource.prototype.hasDynamicImport`
 
 A boolean getter property indicating if the module may call dynamic import.
