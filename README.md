@@ -178,12 +178,12 @@ interface Import {
 
 Returns a list of the explicit named exports of the module of the form `String[]`.
 
-### `AbstractModuleSource.prototype.namespaceReexports()`
+### `AbstractModuleSource.prototype.wildcardExports()`
 
-Returns a list of the imported modules whose namespaces are reexported, of the form `NamespaceReexport[]` defined by:
+Returns the list of imported modules exporting all their exports (`export * from '...'`), of the form `WildcardExport[]` defined by:
 
 ```ts
-interface NamespaceReexport {
+interface WildcardExport {
   specifier: string
 }
 ```
