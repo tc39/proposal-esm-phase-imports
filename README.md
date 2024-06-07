@@ -188,10 +188,6 @@ interface WildcardExport {
 }
 ```
 
-### `AbstractModuleSource.prototype.hasDynamicImport`
-
-A boolean getter property indicating if the module may call dynamic import.
-
 ### `AbstractModuleSource.prototype.hasImportMeta`
 
 A boolean getter property indicating if the module accesses the module `import.meta`.
