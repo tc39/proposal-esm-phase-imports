@@ -117,7 +117,47 @@ layering of future proposals.
 
 The current proposed API is for a `ModuleSource` class instance extending `AbstractModuleSource`.
 
-Helper methods are provided to get the direct list of imports and exports of the module.
+### Dynamic Import
+
+On every source, we define a `[[Module]]` internal slot which contains a reference to an
+`Source Text Module Record` for the source. This represents an unlinked, uninstantiated module
+instance that is uniquely identified for each module source in a given module environment. This
+allows ensuring spec identity between sources and instances in the specification, but
+implementations may choose to optimize out its creation to be lazy or handled in any other way.
+
+When passing any concrete `AbstractModuleSource` instance into a dynamic `import()` expression,
+the module record at its `[[Module]]` internal slot is imported.
+
+### Worker Invocation
+
+The expectation for the HTML integration is that `new Worker(module)` or any concrete instance of
+`AbstractModuleSource` would behave as if the module was first transferred into the worker and then
+imported with dynamic `import()`.
+
+An additional expectation here is also that the created worker inherits the full resolution rules of
+the parent environment that the module source was created from to ensure that module resolution
+behaviour remains the same as in the parent context.
+
+## Source Analysis
+
+### Motivation
+
+In addition to the primary motivation of making this object available, the object representing
+the source for a cyclic module record also naturally serves as a home for source analysis since
+it has information about the compiled source available.
+
+There are two main use cases here:
+
+1. Tooling that analyzes and traces module graphs. These tools need fast access to the imports of
+  a module to continue tracing the graph.
+2. Creating a wrapper around an existing module, that has the same exports shape. Wrapper module
+  construction is useful when mocking or instrumenting modules, and requires comprehensive knowledge
+  of the set of named exports of that module.
+
+### Design
+
+Helper methods are provided to get the direct list of imports and exports of the module, supporting
+both the tracing and module wrapper use cases described.
 
 These helper methods are designed to allow for determining the static public exports and public
 imports of a module, but do not give information about the internal module identifiers or dynamic
@@ -159,27 +199,6 @@ A boolean getter property indicating if the module accesses the module `import.m
 ### `AbstractModuleSource.prototype.hasTopLevelAwait`
 
 A boolean getter property indicating if the module contains use of top-level await.
-
-### Dynamic Import
-
-On every source, we define a `[[Module]]` internal slot which contains a reference to an
-`Source Text Module Record` for the source. This represents an unlinked, uninstantiated module
-instance that is uniquely identified for each module source in a given module environment. This
-allows ensuring spec identity between sources and instances in the specification, but
-implementations may choose to optimize out its creation to be lazy or handled in any other way.
-
-When passing any concrete `AbstractModuleSource` instance into a dynamic `import()` expression,
-the module record at its `[[Module]]` internal slot is imported.
-
-### Worker Invocation
-
-The expectation for the HTML integration is that `new Worker(module)` or any concrete instance of
-`AbstractModuleSource` would behave as if the module was first transferred into the worker and then
-imported with dynamic `import()`.
-
-An additional expectation here is also that the created worker inherits the full resolution rules of
-the parent environment that the module source was created from to ensure that module resolution
-behaviour remains the same as in the parent context.
 
 ## Integration with Other Specifications
 
