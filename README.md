@@ -4,12 +4,29 @@
 
 Champion(s): Luca Casonato, Guy Bedford
 
-Stage: 1
+Stage: 2
 
 ## Problem Statement
 
 This proposal seeks to solve the _static worker_ module analysis problem for
-JavaScript, through defining suitable phase imports for Source Text Module.
+JavaScript, through defining a source phase import for Source Text Module.
+
+## Background
+
+With the recently introduced [Source Phase Imports][], it is now possible to
+define import phases that exist prior to the full linking and execution of the
+module graph.
+
+While WebAssembly is supported, the exact semantics of the source phase for
+ECMAScript modules themselves is not yet specified.
+
+One of the driving specification constraints for these objects is how they
+behave for workers and other agents, which we would argue forms a critical
+design constraint for these features. This is why this proposal's problem
+statement is seen as the most suitable "next step" in the larger module harmony
+layering efforts, with the phase object or objects specified here to support the
+layering of future proposals, including module expressions, module declarations
+and virtualization through compartments loaders.
 
 ## Motivation
 
@@ -63,8 +80,8 @@ for users as well as their support in analysis and build tooling.
 
 ## Proposal
 
-By defining a new phase for ECMAScript module records, it is possible to 
-import a handle to a module statically, and pass this handle to the worker:
+By defining the source phase for ECMAScript module records, it is possible to 
+import a handle to a module statically, and use it to directly initialize the worker:
 
 ```js
 import source myModule from "./my-module.js";
@@ -84,7 +101,7 @@ passed directly to `new Worker`. Bundling can be performed by replacing the
 `./my-module.js` phase import with a phase import to the fully optimized worker
 chunk to load.
 
-Defining this phase would then also lay the ground work for the future module
+Defining the source phase then also lays the ground work for the future module
 harmony proposals that require a source representation.
 
 Since phases also support a dynamic import form, we also define the dynamic variant:
@@ -94,39 +111,27 @@ const workerModule = await import.source('./worker.js');
 new Worker(workerModule);
 ```
 
-## Background
-
-With the recently introduced [Source Phase Imports][], it is now possible to
-define import phases that exist prior to the full linking and execution of the
-module graph.
-
-These phases form the basis of a number of new proposals for modules including
-module declarations, module expressions, deferred module imports, virtualization
-through loaders and new worker semantics.
-
-Currently these phases are not yet specified for ECMAScript modules themselves.
-
-One of the driving specification constraints for these objects is how they
-behave for workers and other agents, which we would argue forms a critical
-design constraint for these features. This is why this proposal's problem
-statement is seen as the most suitable "next step" in the larger module harmony
-layering efforts, with the phase object or objects specified here to support the
-layering of future proposals.
-
 ## Design
 
 The current proposed API is for a `ModuleSource` class instance extending `AbstractModuleSource`.
 
 ### Dynamic Import
 
-On every source, we define a `[[Module]]` internal slot which contains a reference to an
-`Source Text Module Record` for the source. This represents an unlinked, uninstantiated module
-instance that is uniquely identified for each module source in a given module environment. This
-allows ensuring spec identity between sources and instances in the specification, but
-implementations may choose to optimize out its creation to be lazy or handled in any other way.
+Since module sources are obtained from the module registry, they are cached at their registry key,
+just like module instances. Dynamically importing a module source, implies dynamically importing
+the "canonical instance" for the same registry key of that module source.
 
-When passing any concrete `AbstractModuleSource` instance into a dynamic `import()` expression,
-the module record at its `[[Module]]` internal slot is imported.
+In the current spec text, this is handled by converting the `HostGetModuleSourceName` hook for
+module sources into a `HostGetModuleRecordFromSource` hook, which obtains the
+`Source Text Module Record` for the given module source. This record can then be directly driven
+to completion.
+
+_Further refactoring is currently being explored as part of the Stage 2 process to consider whether
+a new key record or a new compiled source record that is distinct from the existing
+`Source Text Module Record` instance record can be defined in ECMA-262. Under such a refactoring, the
+hook might become `HostGetCompiledModuleRecordFromSource` or even just `HostGetKeyFromSource`. In
+addition, such a refactoring might allow supporting importing an `AbstractModuleSource` from another
+realm, without first needing to pass it through structured clone._
 
 ### Worker Invocation
 
@@ -134,9 +139,8 @@ The expectation for the HTML integration is that `new Worker(module)` or any con
 `AbstractModuleSource` would behave as if the module was first transferred into the worker and then
 imported with dynamic `import()`.
 
-An additional expectation here is also that the created worker inherits the full resolution rules of
-the parent environment that the module source was created from to ensure that module resolution
-behaviour remains the same as in the parent context.
+An additional goal here would be for the created worker to inherit the same resolution rules of
+the parent environment that the module source was created from to provide consistent module resolution.
 
 ## Source Analysis
 
