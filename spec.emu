@@ -1200,17 +1200,6 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
-                <ins>[[HasDynamicImport]]</ins>
-              </td>
-              <td>
-                <ins>a Boolean</ins>
-              </td>
-              <td>
-                <ins>Whether this module contains a dynamic `import()` or phased dynamic import expression.</ins>
-              </td>
-            </tr>
-            <tr>
-              <td>
                 <ins>[[HasImportMeta]]</ins>
               </td>
               <td>
@@ -1323,8 +1312,7 @@ contributors: Luca Casonato, Guy Bedford
                 1. Append _ee_ to _indirectExportEntries_.
             1. Let _async_ be _body_ Contains `await`.
             1. <ins>Let _importMeta_ be _body_ Contains |ImportMeta|</ins>.
-            1. <ins>Let _dynamicImport_ be _body_ Contains |ImportCall|</ins>.
-            1. Return Source Text Module Record { [[Realm]]: _realm_, [[Environment]]: ~empty~, [[Namespace]]: ~empty~, [[ModuleSource]]: ~empty~, [[CycleRoot]]: ~empty~, <ins>[[HasDynamicImport]]: _dynamicImport_, [[HasImportMeta]]: _importMeta_, </ins>[[HasTLA]]: _async_, [[AsyncEvaluation]]: *false*, [[TopLevelCapability]]: ~empty~, [[AsyncParentModules]]: « », [[PendingAsyncDependencies]]: ~empty~, [[Status]]: ~new~, [[EvaluationError]]: ~empty~, [[HostDefined]]: _hostDefined_, [[ECMAScriptCode]]: _body_, [[Context]]: ~empty~, [[ImportMeta]]: ~empty~, [[RequestedModules]]: _requestedModules_, [[LoadedModules]]: « », [[ImportEntries]]: _importEntries_, [[LocalExportEntries]]: _localExportEntries_, [[IndirectExportEntries]]: _indirectExportEntries_, [[StarExportEntries]]: _starExportEntries_, [[DFSIndex]]: ~empty~, [[DFSAncestorIndex]]: ~empty~ }.
+            1. Return Source Text Module Record { [[Realm]]: _realm_, [[Environment]]: ~empty~, [[Namespace]]: ~empty~, [[ModuleSource]]: ~empty~, [[CycleRoot]]: ~empty~, <ins>[[HasImportMeta]]: _importMeta_, </ins>[[HasTLA]]: _async_, [[AsyncEvaluation]]: *false*, [[TopLevelCapability]]: ~empty~, [[AsyncParentModules]]: « », [[PendingAsyncDependencies]]: ~empty~, [[Status]]: ~new~, [[EvaluationError]]: ~empty~, [[HostDefined]]: _hostDefined_, [[ECMAScriptCode]]: _body_, [[Context]]: ~empty~, [[ImportMeta]]: ~empty~, [[RequestedModules]]: _requestedModules_, [[LoadedModules]]: « », [[ImportEntries]]: _importEntries_, [[LocalExportEntries]]: _localExportEntries_, [[IndirectExportEntries]]: _indirectExportEntries_, [[StarExportEntries]]: _starExportEntries_, [[DFSIndex]]: ~empty~, [[DFSAncestorIndex]]: ~empty~ }.
           </emu-alg>
           <emu-note>
             <p>An implementation may parse module source text and analyse it for Early Error conditions prior to the evaluation of ParseModule for that module source text. However, the reporting of any errors must be deferred until the point where this specification actually performs ParseModule upon that source text.</p>
@@ -1675,18 +1663,6 @@ contributors: Luca Casonato, Guy Bedford
             1. Perform ! CreateDataPropertyOrThrow(_starExport_, *"specifier"*, _request_.[[Specifier]]).
             1. Append _starExport_ to _starExports_.
           1. Return CreateArrayFromList(_starExports_).
-        </emu-alg>
-      </emu-clause>
-
-      <emu-clause id="sec-%abstractmodulesource%.prototype.hasDynamicImport">
-        <h1><ins>get AbstractModuleSource.prototype.hasDynamicImport</ins></h1>
-        <p>`AbstractModuleSource.prototype.hasDynamicImport` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
-        <emu-alg>
-          1. Let _M_ be the *this* value.
-          1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
-          1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
-          1. Assert: _module_ is a Cyclic Module Record.
-          1. Return _module_.[[HasDynamicImport]].
         </emu-alg>
       </emu-clause>
 
