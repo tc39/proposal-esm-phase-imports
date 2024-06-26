@@ -16,7 +16,7 @@ design questions will need to be resolved for Stage 2.7:
   could possibly be relaxed based on a clearer definition of module keying.
 2. To determine if there is a refactoring of ECMA-262 that exposes a compiled module record instead
   of treating Source Text Module as both a source and an instance representation.
-3. To determine if there is a refactoring of ECMA-272 that generalizes the concept of a module key,
+3. To determine if there is a refactoring of ECMA-262 that generalizes the concept of a module key,
   in a way that can align with (1) and (2) above.
 4. To explore the cross-specification behaviours of worker instantiation and structured clone for module
   sources.
