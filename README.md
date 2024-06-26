@@ -6,6 +6,23 @@ Champion(s): Luca Casonato, Guy Bedford
 
 Stage: 2
 
+## Stage 2 Status
+
+As part of the advancement of this proposal to Stage 2 in the June 2024 TC39 meeting, the following
+design questions will need to be resolved for Stage 2.7:
+
+1. The dynamic import behaviour of module sources across different realms (and in future, compartments), which
+  current throws an error in the spec text when importing a source from another realm. This constraint
+  could possibly be relaxed based on a clearer definition of module keying.
+2. To determine if there is a refactoring of ECMA-262 that exposes a compiled module record instead
+  of treating Source Text Module as both a source and an instance representation.
+3. To determine if there is a refactoring of ECMA-262 that generalizes the concept of a module key,
+  in a way that can align with (1) and (2) above.
+4. To explore the cross-specification behaviours of worker instantiation and structured clone for module
+  sources.
+
+Discussions remain ongoing with regards to the above within the Module Harmony design process.
+
 ## Problem Statement
 
 This proposal seeks to solve the _static worker_ module analysis problem for
