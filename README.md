@@ -190,14 +190,38 @@ Returns a list of the imports of the module of the form `Import[]` defined by:
 
 ```ts
 interface Import {
-  specifier: string,
+  module: string,
   phase: null | 'source'
 }
 ```
 
-### `AbstractModuleSource.prototype.namedExports()`
+This list will intersect with the list of `reexports()`.
+
+### `AbstractModuleSource.prototype.directExports()`
 
 Returns a list of the explicit named exports of the module of the form `String[]`.
+
+Note that the full list of named exports can only be obtained by unioning this list with `reexports()`.
+
+### `AbstractModuleSource.prototype.reexports()`
+
+Returns a list of the reexports of the module of the form `(Reexport | NamespaceReexport)[]`, where:
+
+```ts
+interface Reexport {
+  exportName: string,
+  importName: string,
+  module: string
+}
+
+interface NamespaceReexport {
+  exportName: string,
+  importName: null,
+  module: string
+}
+```
+
+and `NamespaceReexport` represents an export of the form `export * as ns from 'mod'`.
 
 ### `AbstractModuleSource.prototype.wildcardExports()`
 
@@ -205,7 +229,7 @@ Returns the list of imported modules exporting all their exports (`export * from
 
 ```ts
 interface WildcardExport {
-  specifier: string
+  module: string
 }
 ```
 
