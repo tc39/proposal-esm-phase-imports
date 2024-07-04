@@ -195,9 +195,19 @@ interface Import {
 }
 ```
 
-### `AbstractModuleSource.prototype.namedExports()`
+### `AbstractModuleSource.prototype.exports()`
 
-Returns a list of the explicit named exports of the module of the form `String[]`.
+Returns a list of the explicit exports of the module of the form `Export[]` defined by:
+
+```ts
+interface Export {
+  export: string
+}
+```
+
+For complete lexical analysis and detection of ambiguous bindings errors, further export binding information is required
+including `import`, `local` and `from` data for reexports. Whether these should be added is currently under consideration
+in https://github.com/tc39/proposal-esm-phase-imports/issues/20.
 
 ### `AbstractModuleSource.prototype.wildcardExports()`
 
@@ -275,6 +285,10 @@ the deferred imports proposal.
 The module objects defined by the [Module Expressions][] and
 [Module Declarations][] proposals, should align with whatever SourceTextModule
 phase object foundations are specified in this proposal.
+
+Analysis metadata for module declaration imports and exports may exposed through an extension of
+the existing source analysis. These possible analysis extensions are discussed in
+https://github.com/tc39/proposal-esm-phase-imports/issues/19.
 
 ### Compartment Loaders
 

@@ -1634,8 +1634,8 @@ contributors: Luca Casonato, Guy Bedford
         </emu-alg>
       </emu-clause>
 
-      <emu-clause id="sec-%abstractmodulesource%.prototype.namedExports">
-        <h1><ins>%AbstractModuleSource%.prototype.namedExports ( )</ins></h1>
+      <emu-clause id="sec-%abstractmodulesource%.prototype.exports">
+        <h1><ins>%AbstractModuleSource%.prototype.exports ( )</ins></h1>
         <p>This method performs the following steps when called:</p>
         <emu-alg>
           1. Let _M_ be the *this* value.
@@ -1643,12 +1643,17 @@ contributors: Luca Casonato, Guy Bedford
           1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
           1. Assert: _module_ is a Cyclic Module Record.
           1. Let _exportedNames_ be ! _module_.GetExplicitExportedNames().
-          1. Return CreateArrayFromList(_exportedNames_).
+          1. Let _exports_ be a new empty List.
+          1. For each String _exportName_ in _exportedNames_, do
+            1. Let _export_ be OrdinaryObjectCreate(*null*).
+            1. Perform ! CreateDataPropertyOrThrow(_export_, *"export"*, _exportName_).
+            1. Append _export_ to _exports_.
+          1. Return CreateArrayFromList(_exports_).
         </emu-alg>
       </emu-clause>
 
-      <emu-clause id="sec-%abstractmodulesource%.prototype.namespaceReexports">
-        <h1><ins>%AbstractModuleSource%.prototype.namespaceReexports ( )</ins></h1>
+      <emu-clause id="sec-%abstractmodulesource%.prototype.wildcardExports">
+        <h1><ins>%AbstractModuleSource%.prototype.wildcardExports ( )</ins></h1>
         <p>This method performs the following steps when called:</p>
         <emu-alg>
           1. Let _M_ be the *this* value.
