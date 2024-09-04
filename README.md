@@ -197,27 +197,45 @@ interface Import {
 
 ### `AbstractModuleSource.prototype.exports()`
 
-Returns a list of the explicit exports of the module of the form `Export[]` defined by:
+Returns a list of the explicit exports of the module of the form `Export[]` defined by
+`DirectExport | Reexport | ReexportAll`:
 
 ```ts
-interface Export {
-  export: string
+interface DirectExport {
+  type: 'direct',
+  names: string[]
+}
+
+interface Reexport {
+  type: 'reexport',
+  name: string,
+  import: string | null, // null used to indicate a namespace reexport
+  from: string,
+}
+
+interface ReexportAll {
+  type: 'reexport-all',
+  from: string,
 }
 ```
 
-For complete lexical analysis and detection of ambiguous bindings errors, further export binding information is required
-including `import`, `local` and `from` data for reexports. Whether these should be added is currently under consideration
-in https://github.com/tc39/proposal-esm-phase-imports/issues/20.
+`DirectExport` provides multiple names to reflect that a single local binding may be exported under
+multiple aliases.
 
-### `AbstractModuleSource.prototype.wildcardExports()`
+Note that reexports are reported equivalently for both:
 
-Returns the list of imported modules exporting all their exports (`export * from '...'`), of the form `WildcardExport[]` defined by:
-
-```ts
-interface WildcardExport {
-  specifier: string
-}
+```js
+export { a as b } from 'c';
 ```
+
+and:
+
+```js
+import { a as z } from 'c';
+export { z as b }
+```
+
+being represented as `Export { type: 'reexport', name: 'b', import: 'a', from: 'c' }`.
 
 ### `AbstractModuleSource.prototype.hasImportMeta`
 
