@@ -1058,7 +1058,7 @@ contributors: Luca Casonato, Guy Bedford
                 <ins>GetReexports()</ins>
               </td>
               <td>
-                <p><ins>Returns a list of reexports of this module. Reexports are represented by a <dfn id="reexport-record" variants="Reexport Records">Reexport Record</dfn>, of the form { [[ExportName]]: String, [[ImportName]]: String | ~namespace~, [[Request]]: ModuleRequest Record }. Each exported name is unique and does not appear in any of the names returned by GetDirectExports().</ins></p>
+                <p><ins>Returns a list of reexports of this module. Reexports are represented by a <dfn id="reexport-record" variants="Reexport Records">Reexport Record</dfn>, of the form { [[ExportName]]: String, [[ImportName]]: String | ~namespace~, [[ModuleRequest]]: ModuleRequest Record }. Each exported name is unique and does not appear in any of the names returned by GetDirectExports().</ins></p>
               </td>
             </tr>
             <tr>
@@ -1408,12 +1408,12 @@ contributors: Luca Casonato, Guy Bedford
               1. If _e_.[[ImportName]] is ~all~, then
                 1. Assert: _e_.[[ModuleRequest]] is not *null*.
                 1. Assert: _e_.[[LocalName]] is *null*.
-                1. Append the Reexport Record { [[ExportName]]: _e_.[[ExportName]], [[ImportName]]: *null*, [[Request]]: _e_.[[ModuleRequest]] } to _reexports_.
+                1. Append the Reexport Record { [[ExportName]]: _e_.[[ExportName]], [[ImportName]]: *null*, [[ModuleRequest]]: _e_.[[ModuleRequest]] } to _reexports_.
               1. Else if _e_.[[ImportName]] is a String, then
                 1. Assert: _e_.[[ImportName]] is a String.
                 1. Assert: _e_.[[ModuleRequest]] is not *null*.
                 1. Assert: _e_.[[LocalName]] is *null*.
-                1. Append the Reexport Record { [[ExportName]]: _e_.[[ExportName]], [[ImportName]]: _e_.[[ImportName]], [[Request]]: _e_.[[ModuleRequest]] } to _reexports_.
+                1. Append the Reexport Record { [[ExportName]]: _e_.[[ExportName]], [[ImportName]]: _e_.[[ImportName]], [[ModuleRequest]]: _e_.[[ModuleRequest]] } to _reexports_.
             1. Return _reexports_.
           </emu-alg>
         </emu-clause>
@@ -1736,6 +1736,7 @@ contributors: Luca Casonato, Guy Bedford
             1. Perform ! CreateDataPropertyOrThrow(_directExport_, *"names"*, _names_).
             1. Append _directExport_ to _exports_.
           1. Let _reexports_ be ! _module_.GetReexports().
+          1. Sort _reexports_ in lexicographic code unit order sorting of the [[ExportName]] field of each entry.
           1. For each Reexport Record _reexportRecord_ of _reexports_, do
             1. Let _reexport_ be OrdinaryObjectCreate(*null*).
             1. Perform ! CreateDataPropertyOrThrow(_reexport_, *"type"*, *"reexport"*).
@@ -1744,7 +1745,7 @@ contributors: Luca Casonato, Guy Bedford
               1. Perform ! CreateDataPropertyOrThrow(_reexport_, *"import"*, *null*).
             1. Else,
               1. Perform ! CreateDataPropertyOrThrow(_reexport_, *"import"*, _reexportRecord_.[[ImportName]]).
-            1. Perform ! CreateDataPropertyOrThrow(_reexport_, *"from"*, _reexportRecord_.[[Request]].[[Specifier]]).
+            1. Perform ! CreateDataPropertyOrThrow(_reexport_, *"from"*, _reexportRecord_.[[ModuleRequest]].[[Specifier]]).
             1. Append _reexport_ to _exports_.
           1. Let _starExportRequests_ be ! _module_.GetStarExports().
           1. For each ModuleRequest _request_ in _starExportRequests_, do
@@ -1755,6 +1756,10 @@ contributors: Luca Casonato, Guy Bedford
             1. Append _starExport_ to _exports_.
           1. Return CreateArrayFromList(_exports_).
         </emu-alg>
+        <emu-note>
+          <p>Direct exports each provide a *"names"* property for all aliases of the same export in order to allow distinguishing unique export slots of the module, which are semantically exposed in cases like ambiguous export detection.</p>
+          <p>Direct exports are sorted by first sorting the *"names"* property on each direct export entry lexicographically, and then the direct exports entries themselves are sorted based on the first item appearing in each entry's *"names"* property.</p>
+        </emu-note>
       </emu-clause>
 
       <emu-clause id="sec-%abstractmodulesource%.prototype.hasImportMeta">
