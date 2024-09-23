@@ -1750,11 +1750,11 @@ contributors: Luca Casonato, Guy Bedford
             1. Append _reexport_ to _exports_.
           1. Let _starExportRequests_ be ! _module_.GetStarExports().
           1. Let _starExportSpecifiers_ be an empty list.
-          1. For each ModuleRequest _reqest_ in _starExportRequests_, do
+          1. For each ModuleRequest _request_ in _starExportRequests_, do
             1. Assert: _request_.[[Phase]] is ~instance~.
             1. Append _request_.[[Specifier]] to _starExportSpecifiers_.
           1. Sort _starExportSpecifiers_ in lexicographic code unit order.
-          1. For each _specifier_ in _starExportSpecifiers, do
+          1. For each String _specifier_ in _starExportSpecifiers, do
             1. Let _starExport_ be OrdinaryObjectCreate(*null*).
             1. Perform ! CreateDataPropertyOrThrow(_directExport_, *"type"*, *"reexport-all"*).
             1. Perform ! CreateDataPropertyOrThrow(_starExport_, *"from"*, _specifier_).
