@@ -1729,14 +1729,15 @@ contributors: Luca Casonato, Guy Bedford
           1. For each list _names_ in _directExports_, do
             1. Assert: The length of _names_ is greater than 0.
             1. Let _sortedNames_ be a List whose elements are the elements of _names_, sorted according to lexicographic code unit order.
-            1. Insert _sortedNames_ into _sortedDirectExports_ in the position at which the first element of each successive list element of _sortedDirectExports_ retains lexicographic code unit order sorting.
+            1. Append _sortedNames_ to _sortedDirectExports_.
+          1. Sort _sortedDirectExports_ in lexicographic code unit order of the first element of each item.
           1. For each List _names_ in _sortedDirectExports_, do
             1. Let _directExport_ be OrdinaryObjectCreate(*null*).
             1. Perform ! CreateDataPropertyOrThrow(_directExport_, *"type"*, *"direct"*).
             1. Perform ! CreateDataPropertyOrThrow(_directExport_, *"names"*, _names_).
             1. Append _directExport_ to _exports_.
           1. Let _reexports_ be ! _module_.GetReexports().
-          1. Sort _reexports_ in lexicographic code unit order sorting of the [[ExportName]] field of each entry.
+          1. Sort _reexports_ in lexicographic code unit order of the [[ExportName]] field of each entry.
           1. For each Reexport Record _reexportRecord_ of _reexports_, do
             1. Let _reexport_ be OrdinaryObjectCreate(*null*).
             1. Perform ! CreateDataPropertyOrThrow(_reexport_, *"type"*, *"reexport"*).
@@ -1748,11 +1749,15 @@ contributors: Luca Casonato, Guy Bedford
             1. Perform ! CreateDataPropertyOrThrow(_reexport_, *"from"*, _reexportRecord_.[[ModuleRequest]].[[Specifier]]).
             1. Append _reexport_ to _exports_.
           1. Let _starExportRequests_ be ! _module_.GetStarExports().
-          1. For each ModuleRequest _request_ in _starExportRequests_, do
+          1. Let _starExportSpecifiers_ be an empty list.
+          1. For each ModuleRequest _reqest_ in _starExportRequests_, do
             1. Assert: _request_.[[Phase]] is ~instance~.
+            1. Append _request_.[[Specifier]] to _starExportSpecifiers_.
+          1. Sort _starExportSpecifiers_ in lexicographic code unit order.
+          1. For each _specifier_ in _starExportSpecifiers, do
             1. Let _starExport_ be OrdinaryObjectCreate(*null*).
             1. Perform ! CreateDataPropertyOrThrow(_directExport_, *"type"*, *"reexport-all"*).
-            1. Perform ! CreateDataPropertyOrThrow(_starExport_, *"from"*, _request_.[[Specifier]]).
+            1. Perform ! CreateDataPropertyOrThrow(_starExport_, *"from"*, _specifier_).
             1. Append _starExport_ to _exports_.
           1. Return CreateArrayFromList(_exports_).
         </emu-alg>
