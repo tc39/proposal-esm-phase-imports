@@ -195,19 +195,47 @@ interface Import {
 }
 ```
 
-### `AbstractModuleSource.prototype.namedExports()`
+### `AbstractModuleSource.prototype.exports()`
 
-Returns a list of the explicit named exports of the module of the form `String[]`.
-
-### `AbstractModuleSource.prototype.wildcardExports()`
-
-Returns the list of imported modules exporting all their exports (`export * from '...'`), of the form `WildcardExport[]` defined by:
+Returns a list of the explicit exports of the module of the form `Export[]` defined by
+`DirectExport | Reexport | ReexportAll`:
 
 ```ts
-interface WildcardExport {
-  specifier: string
+interface DirectExport {
+  type: 'direct',
+  names: string[]
+}
+
+interface Reexport {
+  type: 'reexport',
+  name: string,
+  import: string | null, // null used to indicate a namespace reexport
+  from: string,
+}
+
+interface ReexportAll {
+  type: 'reexport-all',
+  from: string,
 }
 ```
+
+`DirectExport` provides multiple names to reflect that a single local binding may be exported under
+multiple aliases.
+
+Note that reexports are reported equivalently for both:
+
+```js
+export { a as b } from 'c';
+```
+
+and:
+
+```js
+import { a as z } from 'c';
+export { z as b }
+```
+
+being represented as `Export { type: 'reexport', name: 'b', import: 'a', from: 'c' }`.
 
 ### `AbstractModuleSource.prototype.hasImportMeta`
 
@@ -275,6 +303,10 @@ the deferred imports proposal.
 The module objects defined by the [Module Expressions][] and
 [Module Declarations][] proposals, should align with whatever SourceTextModule
 phase object foundations are specified in this proposal.
+
+Analysis metadata for module declaration imports and exports may exposed through an extension of
+the existing source analysis. These possible analysis extensions are discussed in
+https://github.com/tc39/proposal-esm-phase-imports/issues/19.
 
 ### Compartment Loaders
 
