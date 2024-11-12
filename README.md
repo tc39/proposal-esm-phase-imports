@@ -234,6 +234,54 @@ adding new methods to these existing objects for example.
 
 ## Q&A
 
+### What was source analysis removed from this proposal?
+
+This proposal originally also included adding source analysis properties to the module source
+of the form:
+
+* `AbstractModuleSource.prototype.imports: () => Import[]`
+* `AbstractModuleSource.prototype.exports: () => Export[]`
+* `AbstractModuleSource.prototype.hasImportMeta: boolean`
+* `AbstractModuleSource.prototype.hasTopLevelAwait: boolean`
+
+Where `Import` was defined by:
+
+```ts
+interface Import {
+  specifier: string,
+  phase: null | 'source'
+}
+```
+
+and `Export` was defined by `DirectExport | Reexport | ReexportAll`:
+
+```ts
+interface DirectExport {
+  type: 'direct',
+  names: string[]
+}
+
+interface Reexport {
+  type: 'reexport',
+  name: string,
+  import: string | null, // null used to indicate a namespace reexport
+  from: string,
+}
+
+interface ReexportAll {
+  type: 'reexport-all',
+  from: string,
+}
+```
+
+This feature was removed due to it causing this proposal to have dual motivations.
+
+JS module source analysis may be remotivated in future on JS virtualization work such as compartments.
+
+That this feature was removed in this initial proposal does not by any means indicate that this
+source analysis is not viable in future, only that a narrower focus on use cases was needed for this
+proposal.
+
 _Post an [issue](https://github.com/tc39/proposal-esm-phase-imports/issues)._
 
 [Compartments Proposal]: https://github.com/tc39/proposal-compartments
