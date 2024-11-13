@@ -852,13 +852,13 @@ contributors: Luca Casonato, Guy Bedford
           1. <ins>If _specifier_ is an Object, then</ins>
             1. <ins>Let _module_ be GetModuleSourceModuleRecord(_specifier_).</ins>
             1. <ins>If _module_ is ~not-a-source~, then</ins>
-              1. <ins>Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, « a newly created *TypeError* object »).
-              1. Return _promiseCapability_.[[Promise]].
+              1. <ins>Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, « a newly created *TypeError* object »).</ins>
+              1. <ins>Return _promiseCapability_.[[Promise]].</ins>
             1. <ins>If _module_.[[Realm]] is not equal to the current Realm Record, then</ins>
-              1. <ins>Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, « a newly created *TypeError* object »).
-              1. Return _promiseCapability_.[[Promise]].
+              1. <ins>Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, « a newly created *TypeError* object »).</ins>
+              1. <ins>Return _promiseCapability_.[[Promise]].</ins>
             1. <ins>Perform ContinueDynamicImport(_promiseCapability_, _phase_, Completion(_module_)).</ins>
-          1. <ins>Otherwise,</ins>
+          1. <ins>Else,</ins>
             1. Let _specifierString_ be Completion(ToString(_specifier_)).
             1. IfAbruptRejectPromise(_specifierString_, _promiseCapability_).
             1. Let _moduleRequest_ be a new ModuleRequest Record { [[Specifier]]: _specifierString_, [[Phase]]: _phase_ }.
@@ -1186,53 +1186,6 @@ contributors: Luca Casonato, Guy Bedford
           </table>
         </emu-table>
 
-        <emu-clause id="sec-parsemodule" type="abstract operation">
-          <h1>
-            ParseModule (
-              _sourceText_: ECMAScript source text,
-              _realm_: a Realm Record,
-              _hostDefined_: anything,
-            ): a Source Text Module Record or a non-empty List of *SyntaxError* objects
-          </h1>
-          <dl class="header">
-            <dt>description</dt>
-            <dd>It creates a Source Text Module Record based upon the result of parsing _sourceText_ as a |Module|.</dd>
-          </dl>
-          <emu-alg>
-            1. Let _body_ be ParseText(_sourceText_, |Module|).
-            1. If _body_ is a List of errors, return _body_.
-            1. Let _requestedModules_ be the ModuleRequests of _body_.
-            1. Let _importEntries_ be ImportEntries of _body_.
-            1. Let _importedBoundNames_ be ImportedLocalNames(_importEntries_).
-            1. Let _indirectExportEntries_ be a new empty List.
-            1. Let _localExportEntries_ be a new empty List.
-            1. Let _starExportEntries_ be a new empty List.
-            1. Let _exportEntries_ be ExportEntries of _body_.
-            1. For each ExportEntry Record _ee_ of _exportEntries_, do
-              1. If _ee_.[[ModuleRequest]] is *null*, then
-                1. If _importedBoundNames_ does not contain _ee_.[[LocalName]], then
-                  1. Append _ee_ to _localExportEntries_.
-                1. Else,
-                  1. Let _ie_ be the element of _importEntries_ whose [[LocalName]] is _ee_.[[LocalName]].
-                  1. If _ie_.[[ImportName]] is ~namespace-object~, then
-                    1. NOTE: This is a re-export of an imported module namespace object.
-                    1. Append _ee_ to _localExportEntries_.
-                  1. Else,
-                    1. NOTE: This is a re-export of a single name.
-                    1. Append the ExportEntry Record { [[ModuleRequest]]: _ie_.[[ModuleRequest]], [[ImportName]]: _ie_.[[ImportName]], [[LocalName]]: *null*, [[ExportName]]: _ee_.[[ExportName]] } to _indirectExportEntries_.
-              1. Else if _ee_.[[ImportName]] is ~all-but-default~, then
-                1. Assert: _ee_.[[ExportName]] is *null*.
-                1. Append _ee_ to _starExportEntries_.
-              1. Else,
-                1. Append _ee_ to _indirectExportEntries_.
-            1. Let _async_ be _body_ Contains `await`.
-            1. Return Source Text Module Record { [[Realm]]: _realm_, [[Environment]]: ~empty~, [[Namespace]]: ~empty~, [[CycleRoot]]: ~empty~, [[HasTLA]]: _async_, [[AsyncEvaluation]]: *false*, [[TopLevelCapability]]: ~empty~, [[AsyncParentModules]]: « », [[PendingAsyncDependencies]]: ~empty~, [[Status]]: ~new~, [[EvaluationError]]: ~empty~, [[HostDefined]]: _hostDefined_, [[ECMAScriptCode]]: _body_, [[Context]]: ~empty~, [[ImportMeta]]: ~empty~, <ins>[[ModuleSource]]: ~empty~, </ins>, [[RequestedModules]]: _requestedModules_, [[LoadedModules]]: « », [[ImportEntries]]: _importEntries_, [[LocalExportEntries]]: _localExportEntries_, [[IndirectExportEntries]]: _indirectExportEntries_, [[StarExportEntries]]: _starExportEntries_, [[DFSIndex]]: ~empty~, [[DFSAncestorIndex]]: ~empty~ }.
-          </emu-alg>
-          <emu-note>
-            <p>An implementation may parse module source text and analyse it for Early Error conditions prior to the evaluation of ParseModule for that module source text. However, the reporting of any errors must be deferred until the point where this specification actually performs ParseModule upon that source text.</p>
-          </emu-note>
-        </emu-clause>
-
         <emu-clause id="sec-source-text-module-record-getmodulesource" type="concrete method">
           <h1>
             GetModuleSource ( ): either a normal completion containing an Object or a throw completion
@@ -1288,15 +1241,15 @@ contributors: Luca Casonato, Guy Bedford
         </dl>
 
         <emu-alg>
-          1. Let _moduleRecord_ be *undefined*.
+          1. Let _module_ be *undefined*.
           1. If _moduleSource_ has a [[SourceTextModuleRecord]] internal slot, then
-            1. Set _moduleRecord_ to _moduleSource_.[[SourceTextModuleRecord]].
-          1. Otherwise,
+            1. Set _module_ to _moduleSource_.[[SourceTextModuleRecord]].
+          1. Else,
             1. Let _hostModuleSource_ be HostGetModuleRecordFromSource(_moduleSource_).
             1. If _hostModuleSource_ is ~not-a-source~, return ~not-a-source~.
-          1. Assert: _moduleRecord_ is a concrete Module Record.
-          1. Assert: If _moduleRecord_ is a Source Text Module Record, then _moduleRecord_.[[ModuleSource]] is equal to _moduleSource_.
-          1. Return _moduleRecord_.
+          1. Assert: _module_ is a concrete Module Record.
+          1. Assert: If _module_ is a Source Text Module Record, then _module_.[[ModuleSource]] is equal to _moduleSource_.
+          1. Return _module_.
         </emu-alg>
       </emu-clause>
 
@@ -1423,9 +1376,6 @@ contributors: Luca Casonato, Guy Bedford
           1. <del>Let _sourceNameResult_ be Completion(HostGetModuleSourceName(_O_)).</del>
           1. <del>If _sourceNameResult_ is an abrupt completion, return *undefined*.</del>
           1. <del>Let _name_ be ! _sourceNameResult_.</del>
-          1. <ins>Let _moduleResult_ be Completion(GetModuleSourceModuleRecord(_O_)).</ins>
-          1. <ins>If _moduleResult_ is a normal completion, then<ins>
-            1. <ins>Let _module_ be
           1. <ins>Let _module_ be GetModuleSourceModuleRecord(_O_).</ins>
           1. <ins>If _module_ is ~not-a-source~, return *undefined*.</ins>
           1. <ins>Let _name_ be _module_.GetModuleSourceName().</ins>
