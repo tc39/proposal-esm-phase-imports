@@ -1019,11 +1019,11 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
-                <del>GetExportedNames([_exportStarSet_])</del>
+                GetExportedNames([_exportStarSet_])
               </td>
               <td>
-                <p><del>Return a list of all names that are either directly or indirectly exported from this module.</del></p>
-                <p><del>LoadRequestedModules must have completed successfully prior to invoking this method.</del></p>
+                <p>Return a list of all names that are either directly or indirectly exported from this module.</p>
+                <p>LoadRequestedModules must have completed successfully prior to invoking this method.</p>
               </td>
             </tr>
             <tr>
@@ -1043,30 +1043,6 @@ contributors: Luca Casonato, Guy Bedford
                 <p>Return the binding of a name exported by this module. Bindings are represented by a <dfn id="resolvedbinding-record" variants="ResolvedBinding Records">ResolvedBinding Record</dfn>, of the form { [[Module]]: Module Record, [[BindingName]]: String | ~namespace~ }. If the export is a Module Namespace Object without a direct binding in any module, [[BindingName]] will be set to ~namespace~. Return *null* if the name cannot be resolved, or ~ambiguous~ if multiple bindings were found.</p>
                 <p>Each time this operation is called with a specific _exportName_, _resolveSet_ pair as arguments it must return the same result.</p>
                 <p>LoadRequestedModules must have completed successfully prior to invoking this method.</p>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <ins>GetDirectExports()</ins>
-              </td>
-              <td>
-                <p><ins>Returns a list of lists of the names of each direct export from this module, where each name is unique.</ins></p>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <ins>GetReexports()</ins>
-              </td>
-              <td>
-                <p><ins>Returns a list of reexports of this module. Reexports are represented by a <dfn id="reexport-record" variants="Reexport Records">Reexport Record</dfn>, of the form { [[ExportName]]: String, [[ImportName]]: String | ~namespace~, [[ModuleRequest]]: ModuleRequest Record }. Each exported name is unique and does not appear in any of the names returned by GetDirectExports().</ins></p>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <ins>GetStarExports()</ins>
-              </td>
-              <td>
-                <p><ins>Returns a list of ModuleRequest Records for the star exports of the module.</ins></p>
               </td>
             </tr>
             <tr>
@@ -1091,42 +1067,6 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
           </table>
         </emu-table>
-
-        <emu-clause id="sec-getstarexports" type="concrete method">
-          <h1>
-            <ins>
-              GetStarExports ( ): a List of Module Requests
-            </ins>
-          </h1>
-          <dl class="header">
-            <dt>for</dt>
-            <dd>an Abstract Module Record _module_</dd>
-          </dl>
-          <emu-alg>
-            1. Return a new empty List.
-          </emu-alg>
-          <emu-note>
-            <p>The default implementation of GetStarExports returns an empty list, while concrete Module Records may override this definition.</p>
-          </emu-note>
-        </emu-clause>
-
-        <emu-clause id="sec-getreexports" type="concrete method">
-          <h1>
-            <ins>
-              GetReexports ( ): a List of Module Requests
-            </ins>
-          </h1>
-          <dl class="header">
-            <dt>for</dt>
-            <dd>an Abstract Module Record _module_</dd>
-          </dl>
-          <emu-alg>
-            1. Return a new empty List.
-          </emu-alg>
-          <emu-note>
-            <p>The default implementation of GetReexports returns an empty list, while concrete Module Records may override this definition.</p>
-          </emu-note>
-        </emu-clause>
       </emu-clause>
 
       <emu-clause id="sec-cyclic-module-records">
@@ -1222,17 +1162,6 @@ contributors: Luca Casonato, Guy Bedford
               </td>
               <td>
                 The first visited module of the cycle, the root DFS ancestor of the strongly connected component. For a module not in a cycle this would be the module itself. Once Evaluate has completed, a module's [[DFSAncestorIndex]] is equal to the [[DFSIndex]] of its [[CycleRoot]].
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <ins>[[HasImportMeta]]</ins>
-              </td>
-              <td>
-                <ins>a Boolean</ins>
-              </td>
-              <td>
-                <ins>Whether this module contains an `import.meta` expression.</ins>
               </td>
             </tr>
             <tr>
@@ -1337,104 +1266,11 @@ contributors: Luca Casonato, Guy Bedford
               1. Else,
                 1. Append _ee_ to _indirectExportEntries_.
             1. Let _async_ be _body_ Contains `await`.
-            1. <ins>Let _importMeta_ be _body_ Contains |ImportMeta|</ins>.
-            1. Return Source Text Module Record { [[Realm]]: _realm_, [[Environment]]: ~empty~, [[Namespace]]: ~empty~, [[ModuleSource]]: ~empty~, [[CycleRoot]]: ~empty~, <ins>[[HasImportMeta]]: _importMeta_, </ins>[[HasTLA]]: _async_, [[AsyncEvaluation]]: *false*, [[TopLevelCapability]]: ~empty~, [[AsyncParentModules]]: « », [[PendingAsyncDependencies]]: ~empty~, [[Status]]: ~new~, [[EvaluationError]]: ~empty~, [[HostDefined]]: _hostDefined_, [[ECMAScriptCode]]: _body_, [[Context]]: ~empty~, [[ImportMeta]]: ~empty~, [[RequestedModules]]: _requestedModules_, [[LoadedModules]]: « », [[ImportEntries]]: _importEntries_, [[LocalExportEntries]]: _localExportEntries_, [[IndirectExportEntries]]: _indirectExportEntries_, [[StarExportEntries]]: _starExportEntries_, [[DFSIndex]]: ~empty~, [[DFSAncestorIndex]]: ~empty~ }.
+            1. Return Source Text Module Record { [[Realm]]: _realm_, [[Environment]]: ~empty~, [[Namespace]]: ~empty~, <ins>[[ModuleSource]]: ~empty~, </ins>[[CycleRoot]]: ~empty~, [[HasTLA]]: _async_, [[AsyncEvaluation]]: *false*, [[TopLevelCapability]]: ~empty~, [[AsyncParentModules]]: « », [[PendingAsyncDependencies]]: ~empty~, [[Status]]: ~new~, [[EvaluationError]]: ~empty~, [[HostDefined]]: _hostDefined_, [[ECMAScriptCode]]: _body_, [[Context]]: ~empty~, [[ImportMeta]]: ~empty~, [[RequestedModules]]: _requestedModules_, [[LoadedModules]]: « », [[ImportEntries]]: _importEntries_, [[LocalExportEntries]]: _localExportEntries_, [[IndirectExportEntries]]: _indirectExportEntries_, [[StarExportEntries]]: _starExportEntries_, [[DFSIndex]]: ~empty~, [[DFSAncestorIndex]]: ~empty~ }.
           </emu-alg>
           <emu-note>
             <p>An implementation may parse module source text and analyse it for Early Error conditions prior to the evaluation of ParseModule for that module source text. However, the reporting of any errors must be deferred until the point where this specification actually performs ParseModule upon that source text.</p>
           </emu-note>
-        </emu-clause>
-
-        <emu-clause id="sec-source-text-module-record-getdirectexports" type="concrete method">
-          <h1>
-            <del>
-              GetExportedNames (
-                optional _exportStarSet_: a List of Source Text Module Records,
-              ): a List of Strings
-            </del>
-          </h1>
-          <h1>
-            <ins>
-              GetDirectExports ( ): a List of Lists of Strings
-            </ins>
-          </h1>
-          <dl class="header">
-            <dt>for</dt>
-            <dd>a Source Text Module Record _module_</dd>
-          </dl>
-          <emu-alg>
-            1. <del>Assert: _module_.[[Status]] is not ~new~.</del>
-            1. <del>If _exportStarSet_ is not present, set _exportStarSet_ to a new empty List.</del>
-            1. <del>If _exportStarSet_ contains _module_, then</del>
-              1. <del>Assert: We've reached the starting point of an `export *` circularity.</del>
-              1. <del>Return a new empty List.</del>
-            1. Append _module_ to _exportStarSet_.
-            1. Let _exportedNames_ be a new empty List.
-            1. For each ExportEntry Record _e_ of _module_.[[LocalExportEntries]], do
-              1. Assert: _module_ provides the direct binding for this export.
-              1. Assert: _e_.[[ExportName]] is <del>not *null*</del><ins> a String</ins>.
-              1. Append _e_.[[ExportName]] to _exportedNames_.
-            1. <del>For each ExportEntry Record _e_ of _module_.[[StarExportEntries]], do</del>
-              1. <del>Assert: _e_.[[ModuleRequest]] is not *null*.</del>
-              1. <del>Let _requestedModule_ be GetImportedModule(_module_, _e_.[[ModuleRequest]]).</del>
-              1. <del>Let _starNames_ be _requestedModule_.GetExportedNames(_exportStarSet_).</del>
-              1. <del>For each element _n_ of _starNames_, do</del>
-                1. <del>If _n_ is not *"default"*, then</del>
-                  1. <del>If _exportedNames_ does not contain _n_, then</del>
-                    1. <del>Append _n_ to _exportedNames_.</del>
-            1. Return _exportedNames_.
-          </emu-alg>
-          <emu-note>
-            <p><del>GetExportedNames</del><ins>GetDirectExports</ins> does not filter out or throw an exception for names that have ambiguous star export bindings.</p>
-          </emu-note>
-        </emu-clause>
-
-        <emu-clause id="sec-source-text-module-record-getreexports" type="concrete method">
-          <h1>
-            <ins>
-              GetReexports ( ): a List of Reexport Records
-            </ins>
-          </h1>
-          <dl class="header">
-            <dt>for</dt>
-            <dd>a Source Text Module Record _module_</dd>
-          </dl>
-          <emu-alg>
-            1. Let _reexports_ be a new empty List.
-            1. For each ExportEntry Record _e_ of _module_.[[IndirectExportEntries]], do
-              1. Assert: _module_ imports a specific binding for this export.
-              1. Assert: _e_.[[ExportName]] is a String.
-              1. Assert: _e_.[[ImportName]] is not *null*.
-              1. If _e_.[[ImportName]] is ~all~, then
-                1. Assert: _e_.[[ModuleRequest]] is not *null*.
-                1. Assert: _e_.[[LocalName]] is *null*.
-                1. Append the Reexport Record { [[ExportName]]: _e_.[[ExportName]], [[ImportName]]: *null*, [[ModuleRequest]]: _e_.[[ModuleRequest]] } to _reexports_.
-              1. Else if _e_.[[ImportName]] is a String, then
-                1. Assert: _e_.[[ImportName]] is a String.
-                1. Assert: _e_.[[ModuleRequest]] is not *null*.
-                1. Assert: _e_.[[LocalName]] is *null*.
-                1. Append the Reexport Record { [[ExportName]]: _e_.[[ExportName]], [[ImportName]]: _e_.[[ImportName]], [[ModuleRequest]]: _e_.[[ModuleRequest]] } to _reexports_.
-            1. Return _reexports_.
-          </emu-alg>
-        </emu-clause>
-
-        <emu-clause id="sec-source-text-module-record-getstarexports" type="concrete method">
-          <h1>
-            <ins>
-              GetStarExports ( ): a List of ModuleRequests
-            </ins>
-          </h1>
-          <dl class="header">
-            <dt>for</dt>
-            <dd>a Source Text Module Record _module_</dd>
-          </dl>
-          <emu-alg>
-            1. Let _starExports_ be a new empty List.
-            1. For each ExportEntry Record _e_ of _module_.[[StarExportEntries]], do
-              1. Assert: _e_.[[ModuleRequest]] is not *null*.
-              1. Append _e_.[[ModuleRequest]] to _starExports_.
-            1. Return _starExports_.
-          </emu-alg>
         </emu-clause>
 
         <emu-clause id="sec-source-text-module-record-getmodulesource" type="concrete method">
@@ -1512,102 +1348,6 @@ contributors: Luca Casonato, Guy Bedford
             For any other object types, returns ~unused~ to indicate that the object is not a Module Source Object Instance.
           </li>
         </ul>
-      </emu-clause>
-
-      <emu-clause id="sec-getmodulenamespace" type="abstract operation">
-        <h1>
-          GetModuleNamespace (
-            _module_: an instance of a concrete subclass of Module Record,
-          ): a Module Namespace Object or ~empty~
-        </h1>
-        <dl class="header">
-          <dt>description</dt>
-          <dd>It retrieves the Module Namespace Object representing _module_'s exports, lazily creating it the first time it was requested, and storing it in _module_.[[Namespace]] for future retrieval.</dd>
-        </dl>
-
-        <emu-alg>
-          1. Assert: If _module_ is a Cyclic Module Record, then _module_.[[Status]] is not ~new~ or ~unlinked~.
-          1. Let _namespace_ be _module_.[[Namespace]].
-          1. If _namespace_ is ~empty~, then
-            1. Let _exportedNames_ be <del>_module_.GetExportedNames()</del><ins>GetExportedNames(_module_)</ins>.
-            1. <ins>Let _exportStarSet_ be PopulateExportStarSet(_module_).</ins>
-            1. <ins>For each element _exportStarModule_ of _exportStarSet_, do</ins>
-              1. <ins>Let _starNames_ be _exportStarModule_.GetDirectExports().</ins>
-              1. <ins>For each element _n_ of _starNames_, do</ins>
-                1. <ins>If _n_ is not *"default"*, then</ins>
-                  1. <ins>If _exportedNames_ does not contain _n_, then</ins>
-                    1. <ins>Append _n_ to _exportedNames_.</ins>
-            1. Let _unambiguousNames_ be a new empty List.
-            1. For each element _name_ of _exportedNames_, do
-              1. Let _resolution_ be _module_.ResolveExport(_name_).
-              1. If _resolution_ is a ResolvedBinding Record, append _name_ to _unambiguousNames_.
-            1. Set _namespace_ to ModuleNamespaceCreate(_module_, _unambiguousNames_).
-          1. Return _namespace_.
-        </emu-alg>
-        <emu-note>
-          <p>GetModuleNamespace never throws. Instead, unresolvable names are simply excluded from the namespace at this point. They will lead to a real linking error later unless they are all ambiguous star exports that are not explicitly requested anywhere.</p>
-        </emu-note>
-
-        <emu-clause id="sec-getexportednames" type="abstract operation">
-          <h1>
-            <ins>
-              GetExportedNames (
-                _module_: an Abstract Module Record.
-              ): a List of Strings
-            </ins>
-          </h1>
-          <dl class="header">
-            <dt>description</dt>
-            <dd>Gathers the list of named exports of the module.</dd>
-          </dl>
-          <emu-alg>
-            1. Assert _module_.[[Status]] is not ~new~.
-            1. Let _exportedNames_ be a new empty List.
-            1. Let _directExports_ be ! _module_.GetDirectExports().
-            1. For each element _directExportNames_ of _directExports_, do
-              1. For each String _exportName_ of _directExportNames_, do
-                1. Assert: _exportName_ does not already exist in _directExports_.
-                1. Append _exportName_ to _directExports_.
-            1. Let _reexports_ be ! _module_.GetReexports().
-            1. For each Reexport Record _reexport_ of _reexports_, do
-              1. Append _reexport_.[[ExportName]] to _exportedNames_.
-            1. Return _exportedNames_.
-          </emu-alg>
-          <emu-note>
-            <p>GetDirectExports and GetReexports must always be conformant to export name uniqueness without any duplicated export names between these lists.</p>
-          </emu-note>
-        </emu-clause>
-
-        <emu-clause id="sec-populateexportstarset" type="abstract operation">
-          <h1>
-            <ins>
-              PopulateExportStarSet (
-                _module_: An Abstract Module Record.
-                optional _exportStarSet_: a List of Abstract Module Records,
-              ): a List of Strings
-            </ins>
-          </h1>
-          <dl class="header">
-            <dt>description</dt>
-            <dd>Walks the star export graph populating the module set.</dd>
-          </dl>
-          <emu-alg>
-            1. Assert: _module_.[[Status]] is not ~new~.
-            1. If _exportStarSet_ is not present, set _exportStarSet_ to a new empty List.
-            1. If _exportStarSet_ contains _module_, then
-              1. Assert: We've reached the starting point of an `export *` circularity.
-              1. Return a new empty List.
-            1. Append _module_ to _exportStarSet_.
-            1. Let _starExportRequests_ be ! _module_.GetStarExports().
-            1. For each ModuleRequest _request_ of _starExportRequests_, do
-              1. Let _requestedModule_ be GetImportedModule(_module_, _request_).
-              1. Perform PopulateExportStarSet(_requestedModule_, _exportStarSet_).
-            1. Return _exportStarSet_.
-          </emu-alg>
-          <emu-note>
-            <p>PopulateExportStarSet does not filter out or throw an exception for names that have ambiguous star export bindings.</p>
-          </emu-note>
-        </emu-clause>
       </emu-clause>
     </emu-clause>
   </emu-clause>
@@ -1691,104 +1431,6 @@ contributors: Luca Casonato, Guy Bedford
         </emu-alg>
         <p>This property has the attributes { [[Enumerable]]: *false*, [[Configurable]]: *true* }.</p>
         <p>The initial value of the *"name"* property of this function is *"get [Symbol.toStringTag]"*.</p>
-      </emu-clause>
-
-      <emu-clause id="sec-%abstractmodulesource%.prototype.imports">
-        <h1><ins>%AbstractModuleSource%.prototype.imports ( )</ins></h1>
-        <p>This method performs the following steps when called:</p>
-        <emu-alg>
-          1. Let _M_ be the *this* value.
-          1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
-          1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
-          1. Assert: _module_ is a Cyclic Module Record.
-          1. Let _imports_ be a new empty List.
-          1. For each ModuleRequest Record _request_ of _module_.[[RequestedModules]], do
-            1. Let _import_ be OrdinaryObjectCreate(*null*).
-            1. Perform ! CreateDataPropertyOrThrow(_import_, *"specifier"*, _request_.[[Specifier]]).
-            1. Let _phase_ be _request_.[[Phase]].
-            1. Let _maybePhaseString_ be *null*.
-            1. If _phase_ is ~source~, then
-              1. Set _maybePhaseString_ to *"source"*.
-            1. Perform ! CreateDataPropertyOrThrow(_import_, *"phase"*, _maybePhaseString_).
-            1. Append _import_ to _imports_.
-          1. Return CreateArrayFromList(_imports_).
-        </emu-alg>
-      </emu-clause>
-
-      <emu-clause id="sec-%abstractmodulesource%.prototype.exports">
-        <h1><ins>%AbstractModuleSource%.prototype.exports ( )</ins></h1>
-        <p>This method performs the following steps when called:</p>
-        <emu-alg>
-          1. Let _M_ be the *this* value.
-          1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
-          1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
-          1. Assert: _module_ is a Cyclic Module Record.
-          1. Let _exports_ be a new empty List.
-          1. Let _directExports_ be ! _module_.GetDirectExports().
-          1. Let _sortedDirectExports_ be a new List.
-          1. For each list _names_ in _directExports_, do
-            1. Assert: The length of _names_ is greater than 0.
-            1. Let _sortedNames_ be a List whose elements are the elements of _names_, sorted according to lexicographic code unit order.
-            1. Append _sortedNames_ to _sortedDirectExports_.
-          1. Sort _sortedDirectExports_ in lexicographic code unit order of the first element of each item.
-          1. For each List _names_ in _sortedDirectExports_, do
-            1. Let _directExport_ be OrdinaryObjectCreate(*null*).
-            1. Perform ! CreateDataPropertyOrThrow(_directExport_, *"type"*, *"direct"*).
-            1. Perform ! CreateDataPropertyOrThrow(_directExport_, *"names"*, _names_).
-            1. Append _directExport_ to _exports_.
-          1. Let _reexports_ be ! _module_.GetReexports().
-          1. Sort _reexports_ in lexicographic code unit order of the [[ExportName]] field of each entry.
-          1. For each Reexport Record _reexportRecord_ of _reexports_, do
-            1. Let _reexport_ be OrdinaryObjectCreate(*null*).
-            1. Perform ! CreateDataPropertyOrThrow(_reexport_, *"type"*, *"reexport"*).
-            1. Perform ! CreateDataPropertyOrThrow(_reexport_, *"name"*, _reexportRecord_.[[ExportName]]).
-            1. If _reexportRecord_.[[ImportName]] is ~namespace~, then
-              1. Perform ! CreateDataPropertyOrThrow(_reexport_, *"import"*, *null*).
-            1. Else,
-              1. Perform ! CreateDataPropertyOrThrow(_reexport_, *"import"*, _reexportRecord_.[[ImportName]]).
-            1. Perform ! CreateDataPropertyOrThrow(_reexport_, *"from"*, _reexportRecord_.[[ModuleRequest]].[[Specifier]]).
-            1. Append _reexport_ to _exports_.
-          1. Let _starExportRequests_ be ! _module_.GetStarExports().
-          1. Let _starExportSpecifiers_ be an empty list.
-          1. For each ModuleRequest _request_ in _starExportRequests_, do
-            1. Assert: _request_.[[Phase]] is ~instance~.
-            1. Append _request_.[[Specifier]] to _starExportSpecifiers_.
-          1. Sort _starExportSpecifiers_ in lexicographic code unit order.
-          1. For each String _specifier_ in _starExportSpecifiers, do
-            1. Let _starExport_ be OrdinaryObjectCreate(*null*).
-            1. Perform ! CreateDataPropertyOrThrow(_directExport_, *"type"*, *"reexport-all"*).
-            1. Perform ! CreateDataPropertyOrThrow(_starExport_, *"from"*, _specifier_).
-            1. Append _starExport_ to _exports_.
-          1. Return CreateArrayFromList(_exports_).
-        </emu-alg>
-        <emu-note>
-          <p>Direct exports each provide a *"names"* property for all aliases of the same export in order to allow distinguishing unique export slots of the module, which are semantically exposed in cases like ambiguous export detection.</p>
-          <p>Direct exports are sorted by first sorting the *"names"* property on each direct export entry lexicographically, and then the direct exports entries themselves are sorted based on the first item appearing in each entry's *"names"* property.</p>
-        </emu-note>
-      </emu-clause>
-
-      <emu-clause id="sec-%abstractmodulesource%.prototype.hasImportMeta">
-        <h1><ins>get AbstractModuleSource.prototype.hasImportMeta</ins></h1>
-        <p>`AbstractModuleSource.prototype.hasImportMeta` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
-        <emu-alg>
-          1. Let _M_ be the *this* value.
-          1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
-          1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
-          1. Assert: _module_ is a Cyclic Module Record.
-          1. Return _module_.[[HasImportMeta]].
-        </emu-alg>
-      </emu-clause>
-
-      <emu-clause id="sec-%abstractmodulesource%.prototype.hasTopLevelAwait">
-        <h1><ins>get AbstractModuleSource.prototype.hasTopLevelAwait</ins></h1>
-        <p>`AbstractModuleSource.prototype.hasTopLevelAwait` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
-        <emu-alg>
-          1. Let _M_ be the *this* value.
-          1. Let _module_ be ? HostGetModuleRecordFromSource(_M_).
-          1. If _module_ is ~not-a-source~, throw a *TypeError* exception.
-          1. Assert: _module_ is a Cyclic Module Record.
-          1. Return _module_.[[HasTLA]].
-        </emu-alg>
       </emu-clause>
     </emu-clause>
 
