@@ -837,10 +837,10 @@ contributors: Luca Casonato, Guy Bedford
 
       <emu-clause id="sec-evaluate-import-call" type="abstract operation">
         <h1>
-            EvaluateImportCall (
-              _specifierExpression_: a Parse Node,
-              _phase_: ~source~ or ~evaluation~
-            ): either a normal completion containing a Promise or a throw completion
+          EvaluateImportCall (
+            _specifierExpression_: a Parse Node,
+            _phase_: ~source~ or ~evaluation~
+          ): either a normal completion containing a Promise or a throw completion
         </h1>
         <dl class="header"></dl>
         <emu-alg>
@@ -850,16 +850,19 @@ contributors: Luca Casonato, Guy Bedford
           1. Let _specifier_ be ? GetValue(_specifierRef_).
           1. Let _promiseCapability_ be ! NewPromiseCapability(%Promise%).
           1. <ins>If _specifier_ is an Object, then</ins>
-            1. <ins>Let _module_ be Completion(HostGetModuleRecordFromSource(_specifier_)).</ins>
-            1. <ins>IfAbruptRejectPromise(_module_, _promiseCapability_).</ins>
-            1. <ins>If _module_ is not ~not-a-source~, then</ins>
-              1. <ins>If _module_.[[Realm]] is not equal to current Realm Record, throw a *TypeError* exception.</ins>
-              1. <ins>Perform ContinueDynamicImport(_promiseCapability_, _phase_, Completion(_module_)).</ins>
+            1. <ins>Let _module_ be GetModuleSourceModuleRecord(_specifier_).</ins>
+            1. <ins>If _module_ is ~not-a-source~, then</ins>
+              1. <ins>Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, « a newly created *TypeError* object »).</ins>
               1. <ins>Return _promiseCapability_.[[Promise]].</ins>
-          1. Let _specifierString_ be Completion(ToString(_specifier_)).
-          1. IfAbruptRejectPromise(_specifierString_, _promiseCapability_).
-          1. Let _moduleRequest_ be a new ModuleRequest Record { [[Specifier]]: _specifierString_, [[Phase]]: _phase_ }.
-          1. Perform HostLoadImportedModule(_referrer_, _moduleRequest_, ~empty~, _promiseCapability_).
+            1. <ins>If _module_.[[Realm]] is not equal to the current Realm Record, then</ins>
+              1. <ins>Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, « a newly created *TypeError* object »).</ins>
+              1. <ins>Return _promiseCapability_.[[Promise]].</ins>
+            1. <ins>Perform ContinueDynamicImport(_promiseCapability_, _phase_, Completion(_module_)).</ins>
+          1. <ins>Else,</ins>
+            1. Let _specifierString_ be Completion(ToString(_specifier_)).
+            1. IfAbruptRejectPromise(_specifierString_, _promiseCapability_).
+            1. Let _moduleRequest_ be a new ModuleRequest Record { [[Specifier]]: _specifierString_, [[Phase]]: _phase_ }.
+            1. Perform HostLoadImportedModule(_referrer_, _moduleRequest_, ~empty~, _promiseCapability_).
           1. Return _promiseCapability_.[[Promise]].
         </emu-alg>
         </emu-clause>
@@ -1069,44 +1072,60 @@ contributors: Luca Casonato, Guy Bedford
         </emu-table>
       </emu-clause>
 
-      <emu-clause id="sec-cyclic-module-records">
-        <h1>Cyclic Module Records</h1>
+      <emu-clause id="sec-source-text-module-records">
+        <h1>Source Text Module Records</h1>
 
-        <p>A <dfn id="cyclic-module-record" variants="Cyclic Module Records">Cyclic Module Record</dfn> is used to represent information about a module that can participate in dependency cycles with other modules that are subclasses of the Cyclic Module Record type. Module Records that are not subclasses of the Cyclic Module Record type must not participate in dependency cycles with Source Text Module Records.</p>
-        <p>In addition to the fields defined in <emu-xref href="#table-module-record-fields"></emu-xref> Cyclic Module Records have the additional fields listed in <emu-xref href="#table-cyclic-module-fields"></emu-xref></p>
-        <emu-table id="table-cyclic-module-fields" caption="Additional Fields of Cyclic Module Records">
+        <p>A <dfn id="sourctextmodule-record" variants="Source Text Module Records">Source Text Module Record</dfn> is used to represent information about a module that was defined from ECMAScript source text (<emu-xref href="#sec-ecmascript-language-source-code"></emu-xref>) that was parsed using the goal symbol |Module|. Its fields contain digested information about the names that are imported and exported by the module, and its concrete methods use these digests to link and evaluate the module.</p>
+
+        <p>A Source Text Module Record can exist in a module graph with other subclasses of the abstract Module Record type, and can participate in cycles with other subclasses of the Cyclic Module Record type.</p>
+
+        <p>In addition to the fields defined in <emu-xref href="#table-cyclic-module-fields"></emu-xref>, Source Text Module Records have the additional fields listed in <emu-xref href="#table-additional-fields-of-source-text-module-records"></emu-xref>. Each of these fields is initially set in ParseModule.</p>
+        <emu-table id="table-additional-fields-of-source-text-module-records" caption="Additional Fields of Source Text Module Records" oldids="table-38">
           <table>
+            <thead>
+              <tr>
+                <th>
+                  Field Name
+                </th>
+                <th>
+                  Value Type
+                </th>
+                <th>
+                  Meaning
+                </th>
+              </tr>
+            </thead>
             <tr>
-              <th>
-                Field Name
-              </th>
-              <th>
-                Value Type
-              </th>
-              <th>
-                Meaning
-              </th>
+              <td>
+                [[ECMAScriptCode]]
+              </td>
+              <td>
+                a Parse Node
+              </td>
+              <td>
+                The result of parsing the source text of this module using |Module| as the goal symbol.
+              </td>
             </tr>
             <tr>
               <td>
-                [[Status]]
+                [[Context]]
               </td>
               <td>
-                ~unlinked~, ~linking~, ~linked~, ~evaluating~, ~evaluating-async~, or ~evaluated~
+                an ECMAScript code execution context or ~empty~
               </td>
               <td>
-                Initially ~unlinked~. Transitions to ~linking~, ~linked~, ~evaluating~, possibly ~evaluating-async~, ~evaluated~ (in that order) as the module progresses throughout its lifecycle. ~evaluating-async~ indicates this module is queued to execute on completion of its asynchronous dependencies or it is a module whose [[HasTLA]] field is *true* that has been executed and is pending top-level completion.
+                The execution context associated with this module. It is ~empty~ until the module's environment has been initialized.
               </td>
             </tr>
             <tr>
               <td>
-                [[EvaluationError]]
+                [[ImportMeta]]
               </td>
               <td>
-                a throw completion or ~empty~
+                an Object or ~empty~
               </td>
               <td>
-                A throw completion representing the exception that occurred during evaluation. *undefined* if no exception occurred or if [[Status]] is not ~evaluated~.
+                An object exposed through the `import.meta` meta property. It is ~empty~ until it is accessed by ECMAScript code.
               </td>
             </tr>
             <tr>
@@ -1122,160 +1141,54 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
-                [[DFSIndex]]
+                [[ImportEntries]]
               </td>
               <td>
-                an integer or ~empty~
+                a List of ImportEntry Records
               </td>
               <td>
-                Auxiliary field used during Link and Evaluate only. If [[Status]] is ~linking~ or ~evaluating~, this non-negative number records the point at which the module was first visited during the depth-first traversal of the dependency graph.
-              </td>
-            </tr>
-            <tr>
-              <td>
-                [[DFSAncestorIndex]]
-              </td>
-              <td>
-                an integer or ~empty~
-              </td>
-              <td>
-                Auxiliary field used during Link and Evaluate only. If [[Status]] is ~linking~ or ~evaluating~, this is either the module's own [[DFSIndex]] or that of an "earlier" module in the same strongly connected component.
+                A List of ImportEntry records derived from the code of this module.
               </td>
             </tr>
             <tr>
               <td>
-                [[RequestedModules]]
+                [[LocalExportEntries]]
               </td>
               <td>
-                a List of ModuleRequest Records
+                a List of ExportEntry Records
               </td>
               <td>
-                A List of all the |ModuleSpecifier| strings used by the module represented by this record to request the importation of a module, along with their associated phase (~source~ or ~evaluation~). The List is in source text occurrence order.
-              </td>
-            </tr>
-            <tr>
-              <td>
-                [[CycleRoot]]
-              </td>
-              <td>
-                a Cyclic Module Record or ~empty~
-              </td>
-              <td>
-                The first visited module of the cycle, the root DFS ancestor of the strongly connected component. For a module not in a cycle this would be the module itself. Once Evaluate has completed, a module's [[DFSAncestorIndex]] is equal to the [[DFSIndex]] of its [[CycleRoot]].
+                A List of ExportEntry records derived from the code of this module that correspond to declarations that occur within the module.
               </td>
             </tr>
             <tr>
               <td>
-                [[HasTLA]]
+                [[IndirectExportEntries]]
               </td>
               <td>
-                a Boolean
+                a List of ExportEntry Records
               </td>
               <td>
-                Whether this module is individually asynchronous (for example, if it's a Source Text Module Record containing a top-level await). Having an asynchronous dependency does not mean this field is *true*. This field must not change after the module is parsed.
-              </td>
-            </tr>
-            <tr>
-              <td>
-                [[AsyncEvaluation]]
-              </td>
-              <td>
-                a Boolean
-              </td>
-              <td>
-                Whether this module is either itself asynchronous or has an asynchronous dependency. Note: The order in which this field is set is used to order queued executions, see <emu-xref href="#sec-async-module-execution-fulfilled"></emu-xref>.
+                A List of ExportEntry records derived from the code of this module that correspond to reexported imports that occur within the module or exports from `export * as namespace` declarations.
               </td>
             </tr>
             <tr>
               <td>
-                [[TopLevelCapability]]
+                [[StarExportEntries]]
               </td>
               <td>
-                a PromiseCapability Record or ~empty~
+                a List of ExportEntry Records
               </td>
               <td>
-                If this module is the [[CycleRoot]] of some cycle, and Evaluate() was called on some module in that cycle, this field contains the PromiseCapability Record for that entire evaluation. It is used to settle the Promise object that is returned from the Evaluate() abstract method. This field will be ~empty~ for any dependencies of that module, unless a top-level Evaluate() has been initiated for some of those dependencies.
-              </td>
-            </tr>
-            <tr>
-              <td>
-                [[AsyncParentModules]]
-              </td>
-              <td>
-                a List of Cyclic Module Records
-              </td>
-              <td>
-                If this module or a dependency has [[HasTLA]] *true*, and execution is in progress, this tracks the parent importers of this module for the top-level execution job. These parent modules will not start executing before this module has successfully completed execution.
-              </td>
-            </tr>
-            <tr>
-              <td>
-                [[PendingAsyncDependencies]]
-              </td>
-              <td>
-                an integer or ~empty~
-              </td>
-              <td>
-                If this module has any asynchronous dependencies, this tracks the number of asynchronous dependency modules remaining to execute for this module. A module with asynchronous dependencies will be executed when this field reaches 0 and there are no execution errors.
+                A List of ExportEntry records derived from the code of this module that correspond to `export *` declarations that occur within the module, not including `export * as namespace` declarations.
               </td>
             </tr>
           </table>
         </emu-table>
-      </emu-clause>
-
-      <emu-clause id="sec-source-text-module-records">
-        <h1>Source Text Module Records</h1>
-
-        <emu-clause id="sec-parsemodule" type="abstract operation">
-          <h1>
-            ParseModule (
-              _sourceText_: ECMAScript source text,
-              _realm_: a Realm Record,
-              _hostDefined_: anything,
-            ): a Source Text Module Record or a non-empty List of *SyntaxError* objects
-          </h1>
-          <dl class="header">
-            <dt>description</dt>
-            <dd>It creates a Source Text Module Record based upon the result of parsing _sourceText_ as a |Module|.</dd>
-          </dl>
-          <emu-alg>
-            1. Let _body_ be ParseText(_sourceText_, |Module|).
-            1. If _body_ is a List of errors, return _body_.
-            1. Let _requestedModules_ be the ModuleRequests of _body_.
-            1. Let _importEntries_ be ImportEntries of _body_.
-            1. Let _importedBoundNames_ be ImportedLocalNames(_importEntries_).
-            1. Let _indirectExportEntries_ be a new empty List.
-            1. Let _localExportEntries_ be a new empty List.
-            1. Let _starExportEntries_ be a new empty List.
-            1. Let _exportEntries_ be ExportEntries of _body_.
-            1. For each ExportEntry Record _ee_ of _exportEntries_, do
-              1. If _ee_.[[ModuleRequest]] is *null*, then
-                1. If _importedBoundNames_ does not contain _ee_.[[LocalName]], then
-                  1. Append _ee_ to _localExportEntries_.
-                1. Else,
-                  1. Let _ie_ be the element of _importEntries_ whose [[LocalName]] is _ee_.[[LocalName]].
-                  1. If _ie_.[[ImportName]] is ~namespace-object~, then
-                    1. NOTE: This is a re-export of an imported module namespace object.
-                    1. Append _ee_ to _localExportEntries_.
-                  1. Else,
-                    1. NOTE: This is a re-export of a single name.
-                    1. Append the ExportEntry Record { [[ModuleRequest]]: _ie_.[[ModuleRequest]], [[ImportName]]: _ie_.[[ImportName]], [[LocalName]]: *null*, [[ExportName]]: _ee_.[[ExportName]] } to _indirectExportEntries_.
-              1. Else if _ee_.[[ImportName]] is ~all-but-default~, then
-                1. Assert: _ee_.[[ExportName]] is *null*.
-                1. Append _ee_ to _starExportEntries_.
-              1. Else,
-                1. Append _ee_ to _indirectExportEntries_.
-            1. Let _async_ be _body_ Contains `await`.
-            1. Return Source Text Module Record { [[Realm]]: _realm_, [[Environment]]: ~empty~, [[Namespace]]: ~empty~, <ins>[[ModuleSource]]: ~empty~, </ins>[[CycleRoot]]: ~empty~, [[HasTLA]]: _async_, [[AsyncEvaluation]]: *false*, [[TopLevelCapability]]: ~empty~, [[AsyncParentModules]]: « », [[PendingAsyncDependencies]]: ~empty~, [[Status]]: ~new~, [[EvaluationError]]: ~empty~, [[HostDefined]]: _hostDefined_, [[ECMAScriptCode]]: _body_, [[Context]]: ~empty~, [[ImportMeta]]: ~empty~, [[RequestedModules]]: _requestedModules_, [[LoadedModules]]: « », [[ImportEntries]]: _importEntries_, [[LocalExportEntries]]: _localExportEntries_, [[IndirectExportEntries]]: _indirectExportEntries_, [[StarExportEntries]]: _starExportEntries_, [[DFSIndex]]: ~empty~, [[DFSAncestorIndex]]: ~empty~ }.
-          </emu-alg>
-          <emu-note>
-            <p>An implementation may parse module source text and analyse it for Early Error conditions prior to the evaluation of ParseModule for that module source text. However, the reporting of any errors must be deferred until the point where this specification actually performs ParseModule upon that source text.</p>
-          </emu-note>
-        </emu-clause>
 
         <emu-clause id="sec-source-text-module-record-getmodulesource" type="concrete method">
           <h1>
-              GetModuleSource ( ): either a normal completion containing an Object or a throw completion
+            GetModuleSource ( ): either a normal completion containing an Object or a throw completion
           </h1>
           <dl class="header">
             <dt>for</dt>
@@ -1285,7 +1198,7 @@ contributors: Luca Casonato, Guy Bedford
             <dd></dd>
           </dl>
           <emu-alg>
-            1. <del>Throw a *ReferenceError* exception.</del>
+            1. <del>Throw a *SyntaxError* exception.</del>
             1. <ins>If _module_.[[ModuleSource]] is not ~empty~, then</ins>
               1. <ins>Return _module_.[[ModuleSource]].</ins>
             1. <ins>Let _moduleSource_ be OrdinaryObjectCreate(%ModuleSource.prototype%).</ins>
@@ -1294,6 +1207,50 @@ contributors: Luca Casonato, Guy Bedford
             1. <ins>Return _moduleSource_.</ins>
           </emu-alg>
         </emu-clause>
+
+        <emu-clause id="sec-source-text-module-record-getmodulesourcename" type="concrete method">
+          <h1>
+            <ins>
+              GetModuleSourceName ( ): a String
+            </ins>
+          </h1>
+          <dl class="header">
+            <dt>for</dt>
+            <dd>a Source Text Module Record _module_</dd>
+
+            <dt>description</dt>
+            <dd></dd>
+          </dl>
+          <emu-alg>
+            1. <ins>Return *"ModuleSource"*.</ins>
+          </emu-alg>
+        </emu-clause>
+      </emu-clause>
+
+      <emu-clause id="sec-getmodulesourcemodulerecord" type="abstract operation">
+        <h1>
+          <ins>
+            GetModuleSourceModuleRecord (
+              _moduleSource_: an Object,
+            ): either a Module Record or ~not-a-source~
+          </ins>
+        </h1>
+        <dl class="header">
+          <dt>description</dt>
+          <dd>Provides the concrete Module Record for all Module Source objects.</dd>
+        </dl>
+
+        <emu-alg>
+          1. Let _module_ be *undefined*.
+          1. If _moduleSource_ has a [[SourceTextModuleRecord]] internal slot, then
+            1. Set _module_ to _moduleSource_.[[SourceTextModuleRecord]].
+          1. Else,
+            1. Let _hostModuleSource_ be HostGetModuleRecordFromSource(_moduleSource_).
+            1. If _hostModuleSource_ is ~not-a-source~, return ~not-a-source~.
+          1. Assert: _module_ is a concrete Module Record.
+          1. Assert: If _module_ is a Source Text Module Record, then _module_.[[ModuleSource]] is equal to _moduleSource_.
+          1. Return _module_.
+        </emu-alg>
       </emu-clause>
 
       <emu-clause id="sec-HostGetModuleSourceName" type="host-defined abstract operation">
@@ -1325,30 +1282,28 @@ contributors: Luca Casonato, Guy Bedford
           <ins>
             HostGetModuleRecordFromSource (
               _moduleSource_: an Object,
-            ): either a normal completion containing either a Module Record or ~not-a-source~, or a throw completion
+            ): either a Module Record or ~not-a-source~
           </ins>
         </h1>
         <dl class="header">
           <dt>description</dt>
-          <dd></dd>
+          <dd>Allows hosts to provide the concrete Module Record for a non-ECMA-262 module source object.</dd>
         </dl>
 
         <p>An implementation of HostGetModuleRecordFromSource must conform to the following requirements:</p>
         <ul>
           <li>
-            For any object that is an instance of a concrete implementation of Abstract Module Source that was originally obtained through GetModuleSource, returns a normal completion for a concrete Module Record corresponding to the canonical module for this source.
+            For any object that is an instance of a concrete implementation of Abstract Module Source, returns a concrete Module Record for its module source.
           </li>
           <li>
-            For any ModuleSource Instance, this hook must always return the result of the GetModuleSourceSourceTextModuleRecord.
-          </li>
-          <li>
-            For any object which is a Module Source Object Instance, but was not originally obtained through GetModuleSource, returns a throw completion.
-          </li>
-          <li>
-            For any other object types, returns ~unused~ to indicate that the object is not a Module Source Object Instance.
+            For all other objects, returns ~not-a-source~.
           </li>
         </ul>
       </emu-clause>
+      <emu-note>
+        <p>This host hook is only for module types implemented outside of ECMA-262. See GetModuleSourceModuleRecord, where %ModuleSource% is handled before calling this hook.</p>
+      </emu-note>
+      <p>The default implementation of HostGetModuleRecordFromSource is to return ~not-a-source~.</p>
     </emu-clause>
   </emu-clause>
 </emu-clause>
@@ -1358,7 +1313,7 @@ contributors: Luca Casonato, Guy Bedford
   <emu-clause id="sec-module-source-objects">
     <h1>Module Source Objects</h1>
     <p>Module Source Objects represent modules in their source import phase, which are not linked, instantiated or executed.</p>
-    <p>A <dfn>Module Source Object</dfn> is an object for which <del>HostGetModuleSourceName</del><ins>HostGetModuleRecordFromSource</ins> returns a normal completion.</p>
+    <p>A <dfn>Module Source Object</dfn> is an object for which <del>HostGetModuleSourceName</del><ins>GetModuleSourceModuleRecord</ins> returns a Module Record.</p>
     <p>All Module Source Objects should have a prototype of %AbstractModuleSource%.prototype.</p>
     <p>Hosts may define their own %AbstractModuleSource% subclasses for custom module types.</p>
 
@@ -1421,9 +1376,7 @@ contributors: Luca Casonato, Guy Bedford
           1. <del>Let _sourceNameResult_ be Completion(HostGetModuleSourceName(_O_)).</del>
           1. <del>If _sourceNameResult_ is an abrupt completion, return *undefined*.</del>
           1. <del>Let _name_ be ! _sourceNameResult_.</del>
-          1. <ins>Let _moduleResult_ be Completion(HostGetModuleRecordFromSource(_O_)).</ins>
-          1. <ins>If _moduleResult_ is an abrupt completion, return *undefined*.</ins>
-          1. <ins>Let _module_ be ! _moduleResult_.</ins>
+          1. <ins>Let _module_ be GetModuleSourceModuleRecord(_O_).</ins>
           1. <ins>If _module_ is ~not-a-source~, return *undefined*.</ins>
           1. <ins>Let _name_ be _module_.GetModuleSourceName().</ins>
           1. Assert: _name_ is a String.
