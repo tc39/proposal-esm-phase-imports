@@ -1100,7 +1100,7 @@ contributors: Luca Casonato, Guy Bedford
                 <ins>[[SourceText]]</ins>
               </td>
               <td>
-                <ins>a String</ins>
+                <ins>a sequence of Unicode code points</ins>
               </td>
               <td>
                 <ins>The original source text for this module.</ins>
