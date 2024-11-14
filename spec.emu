@@ -1425,27 +1425,6 @@ contributors: Luca Casonato, Guy Bedford
       <p>ModuleSource instances are ordinary objects that inherit properties from the %ModuleSource% prototype object.</p>
       <p>ModuleSource instances have a [[SourceTextModuleRecord]] internal slot.</p>
     </emu-clause>
-
-    <emu-clause id="sec-abstract-operations-for-modulesource-objects">
-      <h1><ins>Abstract Operations for ModuleSource Objects</ins></h1>
-
-      <emu-clause id="sec-getmodulesourcesourcetextmodulerecord" type="abstract operation">
-        <h1>
-          GetModuleSourceSourceTextModuleRecord (
-            _M_: a ModuleSource Instance
-          ): either a normal completion containing a Source Text Module Record, or a throw completion
-        </h1>
-        <dl class="header">
-        </dl>
-        <emu-alg>
-          1. Perform ? RequireInternalSlot(_M_, [[SourceTextModuleRecord]]).
-          1. Return _M_.[[SourceTextModuleRecord]].
-        </emu-alg>
-        <emu-note>
-          <p>This abstract operation is the required implementation of HostGetModuleRecordFromSource for any object which is a ModuleSource Instance.</p>
-        </emu-note>
-      </emu-clause>
-    </emu-clause>
   </emu-clause>
 </emu-clause>
 
