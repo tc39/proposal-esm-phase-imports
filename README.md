@@ -6,10 +6,10 @@ Champion(s): Luca Casonato, Guy Bedford
 
 Stage: 2
 
-## Stage 2 Status
+## Stage 2 Status Updates
 
 As part of the advancement of this proposal to Stage 2 in the June 2024 TC39 meeting, the following
-design questions will need to be resolved for Stage 2.7:
+design questions were determined for resolution for Stage 2.7:
 
 1. The dynamic import behaviour of module sources across different realms (and in future, compartments), which
   current throws an error in the spec text when importing a source from another realm. This constraint
@@ -21,7 +21,29 @@ design questions will need to be resolved for Stage 2.7:
 4. To explore the cross-specification behaviours of worker instantiation and structured clone for module
   sources.
 
-Discussions remain ongoing with regards to the above within the Module Harmony design process.
+Since then the following conclusions have been made:
+
+1. By unifying on the existing module record, which represents a source and a canonical instance pair
+  together, we are able to fully support dynamic import across realms. Module source objects that are
+  accessed in the "wrong realm" are effectively unusable and will throw, since module sources should
+  go through an explicit clone for these behaviours to work out. Future relaxations would be possible
+  although should be considered to be compatible with compartment linking models.
+2. While there exist future refactorings for compiled module records, these would actually lead to an
+  increase in complexity of the cross-specification semantics currently, without also supporting a
+  more general module keying primtive. The current specifications structures are actually very
+  amenable to the source representation from a specification perspective that make it much easier to
+  specify the design correctly, while future refactorings are still not semantically precluded.
+3. Host-defined module key records may well be a useful future refactoring based on say KeyEquality
+  and KeyLookup operations. But for lookup to work would require an explicit concept of a module
+  registry, bringing a lot of new specification features into ECMA-262. When we tackle module
+  virtualization, the concept of an explicit compartment finally comes up. Having this concept
+  properly defined is likely a prerequisite to module keying primtiives. In the mean time, the HTML
+  spec as the owner of the web module keying works simply and well to handle the different module
+  keying semantics across different source types, which involve custom defined data.
+4. Initial draft HTML spec text has been put together in https://github.com/guybedford/html/pull/4,
+  working through the layering between the JS, HTML and Wasm specifications. The spec layering
+  semantics have been shown to work with this approach. As soon as Stage 2.7 is reached, further
+  development of these downstream specifications can commence.
 
 ## Problem Statement
 
@@ -128,8 +150,6 @@ const workerModule = await import.source('./worker.js');
 new Worker(workerModule);
 ```
 
-## Design
-
 The current proposed API is for a `ModuleSource` class instance extending `AbstractModuleSource`.
 
 ### Dynamic Import
@@ -139,21 +159,14 @@ just like module instances. Dynamically importing a module source, implies dynam
 the "canonical instance" for the same registry key of that module source.
 
 In the current spec text, this is handled by converting the `HostGetModuleSourceName` hook for
-module sources into a `HostGetModuleRecordFromSource` hook, which obtains the
+module sources into a `HostGetModuleSourceModuleRecord` hook, which obtains the
 `Source Text Module Record` for the given module source. This record can then be directly driven
 to completion.
-
-_Further refactoring is currently being explored as part of the Stage 2 process to consider whether
-a new key record or a new compiled source record that is distinct from the existing
-`Source Text Module Record` instance record can be defined in ECMA-262. Under such a refactoring, the
-hook might become `HostGetCompiledModuleRecordFromSource` or even just `HostGetKeyFromSource`. In
-addition, such a refactoring might allow supporting importing an `AbstractModuleSource` from another
-realm, without first needing to pass it through structured clone._
 
 ### Worker Invocation
 
 The expectation for the HTML integration is that `new Worker(module)` or any concrete instance of
-`AbstractModuleSource` would behave as if the module was first transferred into the worker and then
+`AbstractModuleSource` would behave as if the module was first cloned into the worker and then
 imported with dynamic `import()`.
 
 An additional goal here would be for the created worker to inherit the same resolution rules of
