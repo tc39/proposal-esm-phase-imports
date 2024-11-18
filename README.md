@@ -25,8 +25,9 @@ Since then the following conclusions have been made:
 
 1. By unifying on the existing module record, which represents a source and a canonical instance pair
   together, we are able to fully support dynamic import across realms. Module source objects that are
-  accessed in the "wrong realm" are effectively unusable and will throw, since module sources must
-  go through an explicit transfer for these behaviours to work out.
+  accessed in the "wrong realm" are effectively unusable and will throw, since module sources should
+  go through an explicit clone for these behaviours to work out. Future relaxations would be possible
+  although should be considered to be compatible with compartment linking models.
 2. While there exist future refactorings for compiled module records, these would actually lead to an
   increase in complexity of the cross-specification semantics currently, without also supporting a
   more general module keying primtive. The current specifications structures are actually very
@@ -149,8 +150,6 @@ const workerModule = await import.source('./worker.js');
 new Worker(workerModule);
 ```
 
-## Design
-
 The current proposed API is for a `ModuleSource` class instance extending `AbstractModuleSource`.
 
 ### Dynamic Import
@@ -167,7 +166,7 @@ to completion.
 ### Worker Invocation
 
 The expectation for the HTML integration is that `new Worker(module)` or any concrete instance of
-`AbstractModuleSource` would behave as if the module was first transferred into the worker and then
+`AbstractModuleSource` would behave as if the module was first cloned into the worker and then
 imported with dynamic `import()`.
 
 An additional goal here would be for the created worker to inherit the same resolution rules of
