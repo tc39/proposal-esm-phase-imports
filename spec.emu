@@ -1303,7 +1303,7 @@ contributors: Luca Casonato, Guy Bedford
           1. If _moduleSource_ has a [[SourceTextModuleRecord]] internal slot, then
             1. Set _module_ to _moduleSource_.[[SourceTextModuleRecord]].
           1. Else,
-            1. Set _module_ to HostGetModuleRecordFromSource(_moduleSource_).
+            1. Set _module_ to HostGetModuleSourceModuleRecord(_moduleSource_).
             1. If _module_ is ~not-a-source~, return ~not-a-source~.
           1. Assert: _module_ is a concrete Module Record.
           1. Assert: If _module_ is a Source Text Module Record, then _module_.[[ModuleSource]] is equal to _moduleSource_.
@@ -1335,10 +1335,10 @@ contributors: Luca Casonato, Guy Bedford
         </ul>
       </emu-clause>
 
-      <emu-clause id="sec-HostGetModuleRecordFromSource" type="host-defined abstract operation">
+      <emu-clause id="sec-HostGetModuleSourceModuleRecord" type="host-defined abstract operation">
         <h1>
           <ins>
-            HostGetModuleRecordFromSource (
+            HostGetModuleSourceModuleRecord (
               _moduleSource_: an Object,
             ): either a Module Record or ~not-a-source~
           </ins>
@@ -1348,7 +1348,7 @@ contributors: Luca Casonato, Guy Bedford
           <dd>Allows hosts to provide the concrete Module Record for a non-ECMA-262 module source object.</dd>
         </dl>
 
-        <p>An implementation of HostGetModuleRecordFromSource must conform to the following requirements:</p>
+        <p>An implementation of HostGetModuleSourceModuleRecord must conform to the following requirements:</p>
         <ul>
           <li>
             Defines any host-specific module sources, by returning their concrete Module Record.
@@ -1358,7 +1358,7 @@ contributors: Luca Casonato, Guy Bedford
           </li>
         </ul>
       </emu-clause>
-      <p>The default implementation of HostGetModuleRecordFromSource is to return ~not-a-source~.</p>
+      <p>The default implementation of HostGetModuleSourceModuleRecord is to return ~not-a-source~.</p>
       <emu-note>
         <p>This host hook is only for module types implemented outside of ECMA-262. See GetModuleSourceModuleRecord, where %ModuleSource% is handled before calling this hook.</p>
       </emu-note>
@@ -1499,7 +1499,7 @@ contributors: Luca Casonato, Guy Bedford
     <p><b>HostEnsureCanCompileStrings(...)</b></p>
     <p><b>HostFinalizeImportMeta(...)</b></p>
     <p><b>HostGetImportMetaProperties(...)</b></p>
-    <p><b><del>HostGetModuleSourceName</del><ins>HostGetModuleRecordFromSource</ins>(...)</b></p>
+    <p><b><del>HostGetModuleSourceName</del><ins>HostGetModuleSourceModuleRecord</ins>(...)</b></p>
     <p><b>HostGrowSharedArrayBuffer(...)</b></p>
     <p><b>HostHasSourceTextAvailable(...)</b></p>
     <p><b>HostLoadImportedModule(...)</b></p>
