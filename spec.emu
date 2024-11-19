@@ -1061,6 +1061,15 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
+                <ins>ModuleSourcesEqual(_otherModuleRecord_)</ins>
+              </td>
+              <td>
+                <p><ins>For Module Records that implement a normal completion for GetModuleSource(), allows defining a source equality operation for host registry checks.</ins></p>
+                <p><ins>For Module Records that do not have a source representation, ModuleSourcesEqual() is never called.</ins></p>
+              </td>
+            </tr>
+            <tr>
+              <td>
                 <ins>GetModuleSourceName()</ins>
               </td>
               <td>
@@ -1263,6 +1272,28 @@ contributors: Luca Casonato, Guy Bedford
             1. <ins>Set _moduleSource_.[[SourceTextModuleRecord]] to _module_.</ins>
             1. <ins>Set _module_.[[ModuleSource]] to _moduleSource_.</ins>
             1. <ins>Return _moduleSource_.</ins>
+          </emu-alg>
+        </emu-clause>
+
+        <emu-clause id="sec-source-text-module-record-sourceequals" type="concrete method">
+          <h1>
+            <ins>
+              ModuleSourcesEqual (
+                _otherModule_: a Module Record
+              ): a Boolean
+            </ins>
+          </h1>
+          <dl class="header">
+            <dt>for</dt>
+            <dd>a Source Text Module Record _module_</dd>
+
+            <dt>description</dt>
+            <dd>Checks module source equality (not module instance equality) of this module record against another module record</dd>
+          </dl>
+          <emu-alg>
+            1. <ins>If _otherModule_ is not a Source Text Module Record, return *false*.</ins>
+            1. <ins>If _otherModule_.[[SourceText]] is equal to _module_.[[SourceText]], return *true*.</ins>
+            1. <ins>Return *false*.</ins>
           </emu-alg>
         </emu-clause>
 
