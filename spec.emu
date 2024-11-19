@@ -851,7 +851,7 @@ contributors: Luca Casonato, Guy Bedford
           1. Let _promiseCapability_ be ! NewPromiseCapability(%Promise%).
           1. Let _moduleRequest_ be *undefined*.
           1. <ins>If _specifier_ is an Object, then</ins>
-            1. <ins>Set _moduleRequest_ be GetModuleSourceModuleRecord(_specifier_).</ins>
+            1. <ins>Set _moduleRequest_ to GetModuleSourceModuleRecord(_specifier_).</ins>
             1. <ins>If _moduleRequest_ is ~not-a-source~, then</ins>
               1. <ins>Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, « a newly created *TypeError* object »).</ins>
               1. <ins>Return _promiseCapability_.[[Promise]].</ins>
