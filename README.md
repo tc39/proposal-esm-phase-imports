@@ -6,6 +6,8 @@ Champion(s): Luca Casonato, Guy Bedford
 
 Stage: 2
 
+The proposal spec text is currently based to the ECMA-262 PR for Source Phase Imports at https://github.com/tc39/ecma262/pull/3492.
+
 ## Stage 2 Status Updates
 
 As part of the advancement of this proposal to Stage 2 in the June 2024 TC39 meeting, the following
