@@ -1356,7 +1356,7 @@ contributors: Luca Casonato, Guy Bedford
         <h1>
           <ins>
             HostGetModuleSourceModuleRecord (
-              _moduleSource_: an Object,
+              _specifier_: an Object,
             ): either a Module Record or ~not-a-source~
           </ins>
         </h1>
