@@ -1173,7 +1173,7 @@ contributors: Luca Casonato, Guy Bedford
             1. <del>Throw a *SyntaxError* exception.</del>
             1. <ins>If _module_.[[ModuleSource]] is not ~empty~, then</ins>
               1. <ins>Return _module_.[[ModuleSource]].</ins>
-            1. <ins>Let _moduleSource_ be OrdinaryObjectCreate(%ModuleSource.prototype%).</ins>
+            1. <ins>Let _moduleSource_ be OrdinaryObjectCreate(%ModuleSource.prototype%, « [[SourceTextModuleRecord]] »).</ins>
             1. <ins>Set _moduleSource_.[[SourceTextModuleRecord]] to _module_.</ins>
             1. <ins>Set _module_.[[ModuleSource]] to _moduleSource_.</ins>
             1. <ins>Return _moduleSource_.</ins>
