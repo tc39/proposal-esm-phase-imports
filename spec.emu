@@ -844,11 +844,14 @@ contributors: Luca Casonato, Guy Bedford
           1. <ins>If _specifier_ is an Object, then</ins>
             1. <ins>Let _moduleSource_ be GetModuleSourceModuleRecord(_specifier_).</ins>
             1. <ins>If _moduleSource_ is not ~not-a-source~, then</ins>
+              1. If _options_ is not an Object, then
+                1. Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, « a newly created *TypeError* object »).
+                1. Return _promiseCapability_.[[Promise]].
+              1. <ins>Let _attributesObj_ be Completion(Get(_options_, *"with"*)).</ins>
+              1. <ins>IfAbruptRejectPromise(_attributesObj_, _promiseCapability_).</ins>
               1. <ins>If _moduleSource_.[[Realm]] is not the current Realm Record, then</ins>
                 1. <ins>Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, « a newly created *TypeError* object »).</ins>
                 1. <ins>Return _promiseCapability_.[[Promise]].</ins>
-              1. <ins>Let _attributesObj_ be Completion(Get(_options_, *"with"*)).</ins>
-              1. <ins>IfAbruptRejectPromise(_attributesObj_, _promiseCapability_).</ins>
               1. <ins>If _attributesObj_ is not *undefined*, then</ins>
                 1. <ins>Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, « a newly created *TypeError* object »).</ins>
                 1. <ins>Return _promiseCapability_.[[Promise]].</ins>
