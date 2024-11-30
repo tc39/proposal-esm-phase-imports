@@ -981,6 +981,7 @@ contributors: Luca Casonato, Guy Bedford
               <td>
                 <p><ins>For Module Records that return a normal completion for GetModuleSource(), allows defining a source equality operation for host registry checks.</ins></p>
                 <p><ins>For Module Records that do not have a source representation, ModuleSourcesEqual() is never called.</ins></p>
+                <p><ins>This concrete method is not currently called from within ECMA-262 but it is defined for hosts in order to ensure well-defined module source equality.</ins></p>
               </td>
             </tr>
             <tr>
@@ -1207,11 +1208,8 @@ contributors: Luca Casonato, Guy Bedford
           </emu-alg>
 
           <emu-note>
-            <p>This concrete method is not currently called within ECMA-262 but is made available to hosts in order to ensure well-defined module source equality.</p>
-
-            <p>Source equality is a distinct property from key equality, which is necessary to ensure the invariant that HostLoadImportedModule for a module source will always return an instance of that exact same module source, even if its module record may be a different module record.</p>
-
-            <p>By implementing but not using source equality in ECMA-262 we define the meaning of the [[SourceText]] field as distinct from the [[EcmaScriptCode]] in providing this equality.</p>
+            <p>Despite not being called from ECMA-262, ModuleSourcesEqual defines a host equality definition needed in HostLoadImportedModule for Source Text Module Record.</p>
+            <p>It is also the only use of the [[SourceText]] field as providing for this equality checking, distinct from the [[EcmaScriptCode]] field.</p>
           </emu-note>
         </emu-clause>
 
@@ -1272,7 +1270,7 @@ contributors: Luca Casonato, Guy Bedford
               The completion record returned by this operation must not be affected by _moduleRequest_.[[Phase]].
             </li>
             <li>
-              <ins>A _moduleRequest_ is a Module Record when importing a Module Source Object directly. In this case it is only necessary to add the module to the module registry, while possibly coalescing with any existing record on exact key and source equality to maintain the invariants above.</ins>
+              <ins>A _moduleRequest_ is a Module Record when importing a Module Source Object directly. In this case it is only necessary to add the module to the module registry, while possibly coalescing with any existing record on exact key and source equality (checking source equality via ModuleSourcesEqual) to maintain the invariants above.</ins>
             </li>
             <li>
               The operation must treat _payload_ as an opaque value to be passed through to FinishLoadingImportedModule.
