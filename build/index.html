@@ -3603,6 +3603,7 @@ li.menu-search-result-term:before {
               <td>
                 <p><ins>For <emu-xref href="#sec-abstract-module-records" id="_ref_16"><a href="#sec-abstract-module-records">Module Records</a></emu-xref> that return a <emu-xref href="#sec-completion-record-specification-type"><a href="https://tc39.es/ecma262/#sec-completion-record-specification-type">normal completion</a></emu-xref> for GetModuleSource(), allows defining a source equality operation for <emu-xref href="#host"><a href="https://tc39.es/ecma262/#host">host</a></emu-xref> registry checks.</ins></p>
                 <p><ins>For <emu-xref href="#sec-abstract-module-records" id="_ref_17"><a href="#sec-abstract-module-records">Module Records</a></emu-xref> that do not have a source representation, ModuleSourcesEqual() is never called.</ins></p>
+                <p><ins>This concrete method is not currently called from within ECMA-262 but it is defined for <emu-xref href="#host"><a href="https://tc39.es/ecma262/#host">hosts</a></emu-xref> in order to ensure well-defined module source equality.</ins></p>
               </td>
             </tr>
             <tr>
@@ -3759,11 +3760,8 @@ li.menu-search-result-term:before {
           <emu-alg><ol><li><ins>If <var>otherModule</var> is not a <emu-xref href="#sourctextmodule-record"><a href="https://tc39.es/ecma262/#sourctextmodule-record">Source Text Module Record</a></emu-xref>, return <emu-val>false</emu-val>.</ins></li><li><ins>If <var>otherModule</var>.<var class="field">[[SourceText]]</var> is <var>module</var>.<var class="field">[[SourceText]]</var>, return <emu-val>true</emu-val>.</ins></li><li><ins>Return <emu-val>false</emu-val>.</ins></li></ol></emu-alg>
 
           <emu-note><span class="note">Note</span><div class="note-contents">
-            <p>This concrete method is not currently called within ECMA-262 but is made available to <emu-xref href="#host"><a href="https://tc39.es/ecma262/#host">hosts</a></emu-xref> in order to ensure well-defined module source equality.</p>
-
-            <p>Source equality is a distinct property from key equality, which is necessary to ensure the invariant that <emu-xref aoid="HostLoadImportedModule" id="_ref_24"><a href="#sec-HostLoadImportedModule">HostLoadImportedModule</a></emu-xref> for a module source will always return an instance of that exact same module source, even if its module record may be a different module record.</p>
-
-            <p>By implementing but not using source equality in ECMA-262 we define the meaning of the <var class="field">[[SourceText]]</var> field as distinct from the <var class="field">[[EcmaScriptCode]]</var> in providing this equality.</p>
+            <p>Despite not being called from ECMA-262, ModuleSourcesEqual defines a <emu-xref href="#host"><a href="https://tc39.es/ecma262/#host">host</a></emu-xref> equality definition needed in <emu-xref aoid="HostLoadImportedModule" id="_ref_24"><a href="#sec-HostLoadImportedModule">HostLoadImportedModule</a></emu-xref> for <emu-xref href="#sourctextmodule-record"><a href="https://tc39.es/ecma262/#sourctextmodule-record">Source Text Module Record</a></emu-xref>.</p>
+            <p>It is also the only use of the <var class="field">[[SourceText]]</var> field as providing for this equality checking, distinct from the <var class="field">[[EcmaScriptCode]]</var> field.</p>
           </div></emu-note>
         </emu-clause>
 
@@ -3802,7 +3800,7 @@ li.menu-search-result-term:before {
               The completion record returned by this operation must not be affected by <var>moduleRequest</var>.<var class="field">[[Phase]]</var>.
             </li>
             <li>
-              <ins>A <var>moduleRequest</var> is a <emu-xref href="#sec-abstract-module-records" id="_ref_30"><a href="#sec-abstract-module-records">Module Record</a></emu-xref> when importing a <emu-xref href="#sec-module-source-objects" id="_ref_31"><a href="#sec-module-source-objects">Module Source Object</a></emu-xref> directly. In this case it is only necessary to add the module to the module registry, while possibly coalescing with any existing record on exact key and source equality to maintain the invariants above.</ins>
+              <ins>A <var>moduleRequest</var> is a <emu-xref href="#sec-abstract-module-records" id="_ref_30"><a href="#sec-abstract-module-records">Module Record</a></emu-xref> when importing a <emu-xref href="#sec-module-source-objects" id="_ref_31"><a href="#sec-module-source-objects">Module Source Object</a></emu-xref> directly. In this case it is only necessary to add the module to the module registry, while possibly coalescing with any existing record on exact key and source equality (checking source equality via ModuleSourcesEqual) to maintain the invariants above.</ins>
             </li>
             <li>
               The operation must treat <var>payload</var> as an opaque value to be passed through to <emu-xref aoid="FinishLoadingImportedModule" id="_ref_32"><a href="#sec-FinishLoadingImportedModule">FinishLoadingImportedModule</a></emu-xref>.
