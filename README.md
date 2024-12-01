@@ -154,6 +154,9 @@ new Worker(workerModule);
 
 The current proposed API is for a `ModuleSource` class instance extending `AbstractModuleSource`.
 
+This is a new non-global intrinsic with the same reachability properties of
+`AbstractModuleSource` via any source phase import to a JS module.
+
 ### Dynamic Import
 
 Since module sources are obtained from the module registry, they are cached at their registry key,

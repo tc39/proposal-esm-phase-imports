@@ -851,10 +851,10 @@ contributors: Luca Casonato, Guy Bedford
                   1. <ins>Return _promiseCapability_.[[Promise]].</ins>
                 1. <ins>Set _attributesObj_ to Completion(Get(_options_, *"with"*)).</ins>
                 1. <ins>IfAbruptRejectPromise(_attributesObj_, _promiseCapability_).</ins>
-              1. <ins>If _module_.[[Realm]] is not the current Realm Record, then</ins>
+              1. <ins>If _attributesObj_ is not *undefined*, then</ins>
                 1. <ins>Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, « a newly created *TypeError* object »).</ins>
                 1. <ins>Return _promiseCapability_.[[Promise]].</ins>
-              1. <ins>If _attributesObj_ is not *undefined*, then</ins>
+              1. <ins>If _module_.[[Realm]] is not the current Realm Record, then</ins>
                 1. <ins>Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, « a newly created *TypeError* object »).</ins>
                 1. <ins>Return _promiseCapability_.[[Promise]].</ins>
               1. <ins>Set _moduleRequest_ to _module_.</ins>
@@ -981,15 +981,16 @@ contributors: Luca Casonato, Guy Bedford
               <td>
                 <p><ins>For Module Records that return a normal completion for GetModuleSource(), allows defining a source equality operation for host registry checks.</ins></p>
                 <p><ins>For Module Records that do not have a source representation, ModuleSourcesEqual() is never called.</ins></p>
+                <p><ins>This concrete method is not currently called from within ECMA-262 but it is defined for hosts in order to ensure well-defined module source equality.</ins></p>
               </td>
             </tr>
             <tr>
               <td>
-                <ins>GetModuleSourceName()</ins>
+                <ins>GetModuleSourceKind()</ins>
               </td>
               <td>
-                <p><ins>For Module Records that return a normal completion for GetModuleSource(), returns a constant String for each concrete module record that exposes a source representation through `GetModuleSource()`, to be provided in the strongly branded return value of the @@toStringTag getter on %AbstractModuleSource%.</ins></p>
-                <p><ins>For Module Records that do not have a source representation, GetModuleSourceName() is never called.</ins></p>
+                <p><ins>For Module Records that return a normal completion for GetModuleSource(), returns a constant String for each concrete module record that exposes a source representation through `GetModuleSource()`, to be used as the return value of the %Symbol.toStringTag% getter on %AbstractModuleSource%.</ins></p>
+                <p><ins>For Module Records that do not have a source representation, GetModuleSourceKind() is never called.</ins></p>
               </td>
             </tr>
           </table>
@@ -1198,19 +1199,24 @@ contributors: Luca Casonato, Guy Bedford
             <dd>a Source Text Module Record _module_</dd>
 
             <dt>description</dt>
-            <dd>Checks module source equality (not module instance equality) of this module record against another module record</dd>
+            <dd>It checks module source equality (not module instance equality) of this module record against another module record.</dd>
           </dl>
           <emu-alg>
             1. <ins>If _otherModule_ is not a Source Text Module Record, return *false*.</ins>
             1. <ins>If _otherModule_.[[SourceText]] is _module_.[[SourceText]], return *true*.</ins>
             1. <ins>Return *false*.</ins>
           </emu-alg>
+
+          <emu-note>
+            <p>Despite not being called from ECMA-262, ModuleSourcesEqual defines a host equality definition needed in HostLoadImportedModule for Source Text Module Record.</p>
+            <p>It is also the only use of the [[SourceText]] field as providing for this equality checking, distinct from the [[EcmaScriptCode]] field.</p>
+          </emu-note>
         </emu-clause>
 
         <emu-clause id="sec-source-text-module-record-getmodulesourcename" type="concrete method">
           <h1>
             <ins>
-              GetModuleSourceName ( ): a String
+              GetModuleSourceKind ( ): a String
             </ins>
           </h1>
           <dl class="header">
@@ -1264,7 +1270,7 @@ contributors: Luca Casonato, Guy Bedford
               The completion record returned by this operation must not be affected by _moduleRequest_.[[Phase]].
             </li>
             <li>
-              <ins>A _moduleRequest_ is a Module Record when importing a Module Source Object directly. In this case it is only necessary to add the module to the module registry, while possibly coalescing with any existing record on exact key and source equality to maintain the invariants above.</ins>
+              <ins>A _moduleRequest_ is a Module Record when importing a Module Source Object directly. In this case it is only necessary to add the module to the module registry, while possibly coalescing with any existing record on exact key and source equality (checking source equality via ModuleSourcesEqual) to maintain the invariants above.</ins>
             </li>
             <li>
               The operation must treat _payload_ as an opaque value to be passed through to FinishLoadingImportedModule.
@@ -1317,7 +1323,7 @@ contributors: Luca Casonato, Guy Bedford
         </h1>
         <dl class="header">
           <dt>description</dt>
-          <dd>Provides the concrete Module Record for all Module Source objects.</dd>
+          <dd>It provides the concrete Module Record for all Module Source objects.</dd>
         </dl>
 
         <emu-alg>
@@ -1349,7 +1355,7 @@ contributors: Luca Casonato, Guy Bedford
         <p>An implementation of HostGetModuleSourceName must conform to the following requirements:</p>
         <ul>
           <li>
-            For any object that is a Module Source Object, returns a normal completion for a String corresponding to the source record type to be used as the strongly branded return value of the @@toStringTag getter on %AbstractModuleSource%.
+            For any object that is a Module Source Object, returns a normal completion for a String corresponding to the source record type to be used as the strongly branded return value of the %Symbol.toStringTag% getter on %AbstractModuleSource%.
           </li>
           <li>
             For any object which is not a Module Source Object, returns a throw completion.
@@ -1400,9 +1406,9 @@ contributors: Luca Casonato, Guy Bedford
     <emu-clause id="sec-properties-of-the-%abstractmodulesource%-prototype-object">
       <h1>Properties of the %AbstractModuleSource% Prototype Object</h1>
 
-      <emu-clause id="sec-get-%abstractmodulesource%.prototype.@@tostringtag">
-        <h1>get %AbstractModuleSource%.prototype [ @@toStringTag ]</h1>
-        <p>%AbstractModuleSource%.prototype `[@@toStringTag]` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
+      <emu-clause id="sec-get-%abstractmodulesource%.prototype-%symbol.tostringtag%">
+        <h1>get %AbstractModuleSource%.prototype [ %Symbol.toStringTag% ]</h1>
+        <p>%AbstractModuleSource%.prototype `[%Symbol.toStringTag%]` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
         <emu-alg>
           1. Let _O_ be the *this* value.
           1. If _O_ is not an Object, return *undefined*.
@@ -1411,7 +1417,7 @@ contributors: Luca Casonato, Guy Bedford
           1. <del>Let _name_ be ! _sourceNameResult_.</del>
           1. <ins>Let _module_ be GetModuleSourceModuleRecord(_O_).</ins>
           1. <ins>If _module_ is ~not-a-source~, return *undefined*.</ins>
-          1. <ins>Let _name_ be _module_.GetModuleSourceName().</ins>
+          1. <ins>Let _name_ be _module_.GetModuleSourceKind().</ins>
           1. Assert: _name_ is a String.
           1. Return _name_.
         </emu-alg>
