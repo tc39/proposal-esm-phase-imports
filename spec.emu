@@ -1406,7 +1406,7 @@ contributors: Luca Casonato, Guy Bedford
     <emu-clause id="sec-properties-of-the-%abstractmodulesource%-prototype-object">
       <h1>Properties of the %AbstractModuleSource% Prototype Object</h1>
 
-      <emu-clause id="sec-get-%abstractmodulesource%.prototype.%Symbol.tostringtag%">
+      <emu-clause id="sec-get-%abstractmodulesource%.prototype-%symbol.tostringtag%">
         <h1>get %AbstractModuleSource%.prototype [ %Symbol.toStringTag% ]</h1>
         <p>%AbstractModuleSource%.prototype `[%Symbol.toStringTag%]` is an accessor property whose set accessor function is *undefined*. Its get accessor function performs the following steps when called:</p>
         <emu-alg>
