@@ -1209,7 +1209,7 @@ contributors: Luca Casonato, Guy Bedford
 
           <emu-note>
             <p>Despite not being called from ECMA-262, ModuleSourcesEqual defines a host equality definition needed in HostLoadImportedModule for Source Text Module Record.</p>
-            <p>It is also the only use of the [[SourceText]] field as providing for this equality checking, distinct from the [[EcmaScriptCode]] field.</p>
+            <p>The [[SourceText]] field is only used to define source text equality and serialization.</p>
           </emu-note>
         </emu-clause>
 
@@ -1398,7 +1398,8 @@ contributors: Luca Casonato, Guy Bedford
   <h1>Reflection</h1>
   <emu-clause id="sec-module-source-objects">
     <h1>Module Source Objects</h1>
-    <p>Module Source Objects represent modules in their source import phase, which are not linked, instantiated or executed.</p>
+    <p><del>Module Source Objects represent modules in their source import phase, which are not linked, instantiated or executed.</del></p>
+    <p><ins>Module Source Objects represent the immutable data associated with a module record, distinct from linking, instantiation or execution state.</ins></p>
     <p>A <dfn>Module Source Object</dfn> is an object for which <del>HostGetModuleSourceName</del><ins>GetModuleSourceModuleRecord</ins> returns a normal completion.</p>
     <p>All Module Source Objects should have a prototype of %AbstractModuleSource%.prototype.</p>
     <p>Hosts may define their own %AbstractModuleSource% subclasses for custom module types.</p>
