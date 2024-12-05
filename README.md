@@ -4,7 +4,7 @@
 
 Champion(s): Luca Casonato, Guy Bedford
 
-Stage: 2
+Stage: 2.7
 
 The proposal spec text is currently based to the ECMA-262 PR for Source Phase Imports at https://github.com/tc39/ecma262/pull/3492.
 
@@ -23,7 +23,7 @@ design questions were determined for resolution for Stage 2.7:
 4. To explore the cross-specification behaviours of worker instantiation and structured clone for module
   sources.
 
-Since then the following conclusions have been made:
+At Stage 2.7 the following conclusions were made:
 
 1. By unifying on the existing module record, which represents a source and a canonical instance pair
   together, we are able to fully support dynamic import across realms. Module source objects that are
