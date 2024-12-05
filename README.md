@@ -4,7 +4,7 @@
 
 Champion(s): Luca Casonato, Guy Bedford
 
-Stage: 2.7
+Stage: 2, with Stage 2.7 conditional on https://github.com/tc39/proposal-esm-phase-imports/issues/46 being resolved.
 
 The proposal spec text is currently based to the ECMA-262 PR for Source Phase Imports at https://github.com/tc39/ecma262/pull/3492.
 
