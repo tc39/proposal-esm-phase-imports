@@ -213,6 +213,10 @@ adding new methods to these existing objects for example.
 
 ## Q&A
 
+### What were the Stage 2 and Stage 2.7 considerations for this proposal?
+
+See the former status updates at https://github.com/tc39/proposal-esm-phase-imports/issues/50.
+
 ### What was source analysis removed from this proposal?
 
 This proposal originally also included adding source analysis properties to the module source
