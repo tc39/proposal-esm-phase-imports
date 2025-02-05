@@ -4,48 +4,9 @@
 
 Champion(s): Luca Casonato, Guy Bedford
 
-Stage: 2, with Stage 2.7 conditional on https://github.com/tc39/proposal-esm-phase-imports/issues/46 being resolved.
+Stage 2.7
 
 The proposal spec text is currently based to the ECMA-262 PR for Source Phase Imports at https://github.com/tc39/ecma262/pull/3492.
-
-## Stage 2 Status Updates
-
-As part of the advancement of this proposal to Stage 2 in the June 2024 TC39 meeting, the following
-design questions were determined for resolution for Stage 2.7:
-
-1. The dynamic import behaviour of module sources across different realms (and in future, compartments), which
-  current throws an error in the spec text when importing a source from another realm. This constraint
-  could possibly be relaxed based on a clearer definition of module keying.
-2. To determine if there is a refactoring of ECMA-262 that exposes a compiled module record instead
-  of treating Source Text Module as both a source and an instance representation.
-3. To determine if there is a refactoring of ECMA-262 that generalizes the concept of a module key,
-  in a way that can align with (1) and (2) above.
-4. To explore the cross-specification behaviours of worker instantiation and structured clone for module
-  sources.
-
-At Stage 2.7 the following conclusions were made:
-
-1. By unifying on the existing module record, which represents a source and a canonical instance pair
-  together, we are able to fully support dynamic import across realms. Module source objects that are
-  accessed in the "wrong realm" are effectively unusable and will throw, since module sources should
-  go through an explicit clone for these behaviours to work out. Future relaxations would be possible
-  although should be considered to be compatible with compartment linking models.
-2. While there exist future refactorings for compiled module records, these would actually lead to an
-  increase in complexity of the cross-specification semantics currently, without also supporting a
-  more general module keying primtive. The current specifications structures are actually very
-  amenable to the source representation from a specification perspective that make it much easier to
-  specify the design correctly, while future refactorings are still not semantically precluded.
-3. Host-defined module key records may well be a useful future refactoring based on say KeyEquality
-  and KeyLookup operations. But for lookup to work would require an explicit concept of a module
-  registry, bringing a lot of new specification features into ECMA-262. When we tackle module
-  virtualization, the concept of an explicit compartment finally comes up. Having this concept
-  properly defined is likely a prerequisite to module keying primtiives. In the mean time, the HTML
-  spec as the owner of the web module keying works simply and well to handle the different module
-  keying semantics across different source types, which involve custom defined data.
-4. Initial draft HTML spec text has been put together in https://github.com/guybedford/html/pull/4,
-  working through the layering between the JS, HTML and Wasm specifications. The spec layering
-  semantics have been shown to work with this approach. As soon as Stage 2.7 is reached, further
-  development of these downstream specifications can commence.
 
 ## Problem Statement
 
