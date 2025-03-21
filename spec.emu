@@ -975,11 +975,11 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
-                <ins>GetModuleSourceKind()</ins>
+                GetModuleSourceKind()
               </td>
               <td>
-                <p><ins>Returns a constant string for each concrete module record that exposes a source representation through their [[ModuleSource]] field, to be used as the return value of the %Symbol.toStringTag% getter on %AbstractModuleSource%.</ins></p>
-                <p><ins>For Module Records that do not have a source representation, GetModuleSourceKind() is never called.</ins></p>
+                <p>Returns a constant string for each concrete module record that exposes a source representation through their [[ModuleSource]] field, to be used as the return value of the %Symbol.toStringTag% getter on %AbstractModuleSource%.</p>
+                <p>For Module Records that do not have a source representation, GetModuleSourceKind() is never called.</p>
               </td>
             </tr>
           </table>
