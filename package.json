@@ -12,10 +12,10 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@tc39/ecma262-biblio": "2.1.2626",
-    "ecmarkup": "^17.1.1"
+    "@tc39/ecma262-biblio": "2.1.3023",
+    "ecmarkup": "^23.0.2"
   },
   "engines": {
-    "node": ">= 12"
+    "node": ">= 20"
   }
 }
