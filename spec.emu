@@ -1283,12 +1283,21 @@ contributors: Luca Casonato, Guy Bedford
             The host environment must perform FinishLoadingImportedModule(_referrer_, _moduleRequest_, _payload_, _result_), where _result_ is either a normal completion containing the loaded Module Record or a throw completion, either synchronously or asynchronously.
           </li>
           <li>
-            <p>If this operation is called multiple times with two (_referrer_, _moduleRequest_) pairs such that:</p>
+            <p><ins>For every pair (_referrer_, _moduleRequest_) that calls FinishLoadingImportedModule(_referrer_, _moduleRequest_, _payload_, NormalCompletion(_module_)) with a normal completion, hosts must define a singular <dfn>Canonical ModuleRequest Record</dfn>, _moduleRequestKey_, satisfying:</ins></p>
             <ul>
-              <li>the first _referrer_ is the same as the second _referrer_;</li>
-              <li>ModuleRequestsEqual(the first _moduleRequest_, the second _moduleRequest_) is *true*;</li>
+              <li><ins>_moduleRequestKey_.[[Phase]] is equal to ~source~ (the lowest possible phase);</ins></li>
+              <li><ins>FinishLoadingImportedModule will return the same NormalCompletion(_module_) _result_ for all (_otherReferrer_, _otherModuleRequest_) pairs whose Canonical ModuleRequest Record is also _moduleRequestKey_;</ins></li>
+              <li><ins>For any other module request _otherModuleRequest_ with Canonical ModuleRequest Record _otherModuleRequestKey_, if ModuleRequestsEqual(_moduleRequest_, _otherModuleRequest_) is *true*, then ModuleRequestsEqual(_moduleRequestKey_, _otherModuleRequestKey_) must be *true*.</ins></li>
             </ul>
-            <p>and it performs FinishLoadingImportedModule(_referrer_, _moduleRequest_, _payload_, _result_) where _result_ is a normal completion, then it must perform FinishLoadingImportedModule(_referrer_, _moduleRequest_, _payload_, _result_) with the same _result_ each time.</p>
+            <p>If this operation is called multiple times <ins>first with (_referrer1_, _moduleRequest1_, _hostDefined1_, _payload1_) and later with (_referrer2_, _moduleRequest2_, _hostDefined2_, _payload2_)</ins><del>with two (_referrer_, _moduleRequest_) pairs</del> such that:</p>
+            <ul>
+              <li><ins>it performs FinishLoadingImportedModule(_referrer1_, _moduleRequest1_, _payload1_, NormalCompletion(_module1_)) and FinishLoadingImportedModule(_referrer2_, _moduleRequest2_, _payload2_, NormalCompletion(_module2_)) both with normal completions for Module Records _module1_ and _module2_;</ins></li>
+              <li><ins>_moduleRequestKey1_ and _moduleRequestKey2_ are the Canonical ModuleRequest Records for (_referrer1_, _moduleRequest1_) and (_referrer2_, _moduleRequest2_) respectively as defined above;</ins></li>
+              <li><del>the first _referrer_ is the same as the second _referrer_;</del></li>
+              <li>ModuleRequestsEqual(<ins>_moduleRequestKey1_</ins><del>the first _moduleRequest_</del>, <ins>_moduleRequestKey2_</ins><del>the second _moduleRequest_</del>) is *true*;</li>
+            </ul>
+            <p><del>and it performs FinishLoadingImportedModule(_referrer_, _moduleRequest_, _payload_, _result_) where _result_ is a normal completion, then it must perform FinishLoadingImportedModule(_referrer_, _moduleRequest_, _payload_, _result_) with the same _result_ each time.</del></p>
+            <p><ins>then FinishedLoadingImportedModule must be called with _module2_ equal to _module1_.</ins></p>
           </li>
           <li>
             The completion record returned by this operation must not be affected by _moduleRequest_.[[Phase]].
