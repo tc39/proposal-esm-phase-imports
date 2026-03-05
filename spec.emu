@@ -853,11 +853,6 @@ contributors: Luca Casonato, Guy Bedford
               1. <ins>If _attributesObj_ is not *undefined*, then</ins>
                 1. <ins>Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, « a newly created *TypeError* object »).</ins>
                 1. <ins>Return _promiseCapability_.[[Promise]].</ins>
-              1. <ins>Let _proto_ be ? <emu-meta effects="user-code">_specifier_.[[GetPrototypeOf]]</emu-meta>().</ins>
-              1. <ins>Let _superProto_ be ? <emu-meta effects="user-code">_proto_.[[GetPrototypeOf]]</emu-meta>().</ins>
-              1. <ins>if SameValue(_superProto_, %AbstractModuleSource.prototype%) is *false*, then:</ins>
-                1. <ins>Perform ! Call(_promiseCapability_.[[Reject]], *undefined*, « a newly created *TypeError* object »).</ins>
-                1. <ins>Return _promiseCapability_.[[Promise]].</ins>
               1. <ins>Let _moduleRequest_ be a new ModuleRequest Record { [[Specifier]]: _moduleSourceRecord_, [[Phase]]: _phase_, [[Attributes]]: « » }.</ins>
               1. Perform HostLoadImportedModule(_referrer_, _moduleRequest_, ~empty~, _promiseCapability_).
               1. Return _promiseCapability_.[[Promise]].
