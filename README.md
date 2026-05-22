@@ -118,27 +118,155 @@ The current proposed API is for a `ModuleSource` class instance extending `Abstr
 This is a new non-global intrinsic with the same reachability properties of
 `AbstractModuleSource` via any source phase import to a JS module.
 
+## Semantics
+
+The proposal defines the following new semantics:
+
+1. The new `ModuleSource` intrinsic, exposed on the global object.
+2. Source phase imports for `Source Text Module Record` - `import source mod from './mod.js'`.
+3. Dynamic import of a module source - `import(mod)` both where `mod` is a `ModuleSource` instance **and** `mod` is a `WebAssembly.Module` instance.
+4. The serialization and transfer semantics of `ModuleSource` between agents, via both `postMessage` and `structuredClone`.
+
+Ensuring well-defined module keying semantics is thus a critical aspect of this proposal.
+In addition, transfer semantics and security integration semantics also relate strongly to the keying
+model.
+
+### The ModuleSource Object
+
+A `ModuleSource` instance contains an internal `[[SourceTextModuleRecord]]` slot which points to its underlying module record.
+
+The `ModuleSource` constructor is not constructible and throws a TypeError error if attempting to be constructed. There
+are currently no plans to make the `ModuleSource` constructor available, since this is deemed to be a new evaluation vector.
+
+Instead, the ways to obtain a `ModuleSource` instance consisting of a valid `[[SourceTextModuleRecord]]` slot is via:
+
+1. `import source myModule from '/module.js'` source phase imports
+2. `module myModule { ... }` module declarations in future, when that proposal adds this (which implies `eval('module myModule { ... } myModule'`)
+3. Via serialization in worker messages or via `structuredClone(myModule)`.
+
 ### Dynamic Import
 
-Since module sources are obtained from the module registry, they are cached at their registry key,
-just like module instances. Dynamically importing a module source, implies dynamically importing
-the "canonical instance" for the same registry key of that module source.
+Since `ModuleSource` points to its `[[SourceTextModuleRecord]]`, `import(moduleSource)` of a module source is defined as
+importing that module record.
 
-In the current spec text, this is handled by converting the `HostGetModuleSourceName` hook for
-module sources into a `HostGetModuleSourceModuleRecord` hook, which obtains the
-`Source Text Module Record` for the given module source. This record can then be directly driven
-to completion.
+### Structured Clone
 
-### Worker Invocation
+When applying `structuredClone(module)`, not only is a new `ModuleSource` instance created, but a new `[[SourceTextModuleRecord]]` is also created
+due to the serialization and deserialization of the module record itself.
+
+This way, structured clone results in multi-instancing of the module:
+
+```js
+import source module from '/module.js';
+let module2 = structuredClone(module);
+await import(module) !== await import(module2);
+```
+
+While not part of this specification, the unique identity of each module source, despite having the same URL key is what will also
+allow multiple module declarations to exist in the same module with the same URL while having separate instances:
+
+```js
+// SYNTAX NOT SPECIFIED HERE - See Module Declarations Proposal
+module moduleA {
+  export let url = import.meta.url;
+}
+module moduleB {
+  export let url = import.meta.url;
+}
+
+const [moduleA, moduleB] = await Promise.all(import(moduleA), import(moduleB));
+moduleA === moduleB // false
+moduleA.url === import.meta.url // true
+moduleA.url === moduleB.url // true
+``` 
+
+### Agent Transfer
+
+Agent transfer needs to support populating registry source text with transferred sources.
+
+For example consider transferring a source and importing it from a worker:
+
+```js
+import source mod from '/mod.js';
+
+const worker = new Worker('/worker.js');
+worker.postMessage(mod);
+```
+
+Where `/worker.js` contains:
+
+```js
+onmessage = ({ mod: data }) => {
+  const instance1 = await import(mod);
+  // Later on:
+  const instance2 = await import('/mod.js');
+  instance1 === instance2 // true
+
+  const source = await import.source('/mod.js');
+  source === mod // true
+};
+```
+
+The worker does not need to fetch the source for `mod.js` since it was serialized and transferred with
+the `ModuleSource` record.
+
+Later, when we import the string specifier `/mod.js` directly, we obtain an instance that is the same as the
+one that was imported, since the `import(mod)` itself injects the module key for `mod` into the registry.
+
+We can see this by importing the source phase import for `/mod.js` - that it returns the source we provided.
+
+But what if the worker had imported `/mod.js` first? And what if the worker's network request was made later on
+and it received a different source text for `/mod.js` over the wire?
+
+```js
+onmessage = ({ mod: data }) => {
+  const instanceA = await import('/mod.js');
+  // Later on:
+  const instanceB = await import(mod);
+  instanceA === instanceB // false
+
+  const source = await import.source('/mod.js');
+  source === mod // false
+};
+```
+
+What happens here instead is that the "canonical instance" in the module registry is defined by the first
+importer, so that when the module source version received via `postMessage` is imported, it is not
+able to return the same instance.
+
+We define a concrete method in the spec, `ModuleSourcesEqual` which is able to perform source text
+equality to perform coalescing here _only if_ the exact source text is the same.
+
+### Module Keying
+
+In the current ECMA-262 specification, the `HostLoadImportedModule` idempotency property defines _module keying semantics_.
+The guarantee here is that if two imports are made to the same `Module Request` (specifier and attributes list),
+that the same `Module Record` must be returned.
+
+When supporting `ModuleSource` in dynamic import, we effectively extend this property to Module Source imports, by defining
+the concept of _module source equality_.
+
+The rule here then is based on registry coalescing, and supporting multiple modules with the same URL in the registry:
+
+1. When a module source is imported, its URL is injected into the module registry, unless another module already exists
+  at that URL.
+2. If a module already exists at the URL, we check if the module source for that module exactly matches the source text
+  of the module source of the module source being imported, and if it does we return the existing instance.
+3. If the existing instance does not exist, the module is not added to the registry at all, instead it is uniquely instanced
+  based on the identity of the module source itself. In this sense there is a secondary registry consisting of a weak map from
+  module source objects to module instances.
+
+## Web Spec Integrations
+
+### Web Workers
 
 The expectation for the HTML integration is that `new Worker(module)` or any concrete instance of
 `AbstractModuleSource` would behave as if the module was first cloned into the worker and then
 imported with dynamic `import()`.
 
-An additional goal here would be for the created worker to inherit the same resolution rules of
-the parent environment that the module source was created from to provide consistent module resolution.
-
-## Integration with Other Specifications
+An additional goal here would be for workers constructed this way to automatically inherit the same
+resolution rules of the parent environment that the module source was created from to provide
+consistent module resolution.
 
 ### CSP Integration
 
@@ -157,51 +285,31 @@ requiring CSP policy verification against the `src` for the module. In this case
 possible to recreate the original CSP `src` from the `[[HostDefined]]` data, without needing any
 explicit ECMA-262 integration.
 
-### Structured Clone
+## Module Harmony Layering
 
-A `ModuleSource` instance can be supportable in structured clone, since the underlying
-source data has no realm-dependence. Any data stored in `[[HostDefined]]` would need to be
-defined to itself be structured cloneable to be able to be recreated.
+This spec is designed to layer with future module harmony proposals, specifically
+with [Module Declarations][] and [Compartments][].
 
-## Layering
+### Module Declarations
 
-### Source Phase Imports
+Module declarations permit the definition of nested modules, whose runtime
+representation is designed here to be `ModuleSource`:
 
-This proposal is designed to work in conjunction with [Source Phase Imports][],
-whether or not it directly specifies a source phase for ECMAScript modules.
+```js
+module myModule {
+  import 'dependency';
+  export function main () {
+  }
+}
 
-### Import Attributes
+myModule instanceof ModuleSource; // true
+import(myModule);
+```
 
-The [Import Attributes Proposal][] provides a way to pass attributes to the
-module loader. These attributes are used during source loading and resolution.
-Because the module source has already gone through this process, they are
-already _attributes-influenced_ by the time their handle is obtained.
+The module keying model for `ModuleSource` thus needs to take into account
+that multiple modules may share a URL.
 
-When passing a module module source object to a dynamic `import()` or `new Worker`,
-any additional `with` attributes would therefore be unsupported - and setting attributes
-would throw an error.
-
-### Deferred imports
-
-The [Deferred Imports][] proposal provides a way to defer the synchronous
-evaluation of a module until it is needed, but not to defer the linking of the
-module. This is a phase between the "module context attach" phase and the
-"evaluation" phase.
-
-As an entirely separate phase, this proposal does not otherwise interact with
-the deferred imports proposal.
-
-### Module Expressions & Module Declarations
-
-The module objects defined by the [Module Expressions][] and
-[Module Declarations][] proposals, should align with whatever SourceTextModule
-phase object foundations are specified in this proposal.
-
-Analysis metadata for module declaration imports and exports may exposed through an extension of
-the existing source analysis. These possible analysis extensions are discussed in
-https://github.com/tc39/proposal-esm-phase-imports/issues/19.
-
-### Compartment Loaders
+### Compartments
 
 The [Compartments Proposal][] provides a way to dynamically create module
 instances from module source objects, optionally providing custom loaders.
@@ -210,6 +318,9 @@ The module source definition here is being aligned with the definitions in use
 within this proposal and others. Where they are specified in this proposal or others,
 the compartment loaders proposal may extend their functionality further in future by
 adding new methods to these existing objects for example.
+
+The module keying semantics designed in this specification would extend to multi
+registry keying when used with compartments.
 
 ## Q&A
 
