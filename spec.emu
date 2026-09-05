@@ -1105,13 +1105,13 @@ contributors: Luca Casonato, Guy Bedford
             </tr>
             <tr>
               <td>
-                <ins>[[SourceText]]</ins>
+                <ins>[[SourceIdentity]]</ins>
               </td>
               <td>
-                <ins>ECMAScript source text or ~none~</ins>
+                <ins>a module source identity</ins>
               </td>
               <td>
-                <ins>The original <emu-xref href="#sec-source-text">source text</emu-xref> for this module, if a Source Text Module Record.</ins>
+                <ins>The module source identity of this module source (<emu-xref href="#sec-createnewmodulesourceidentity"></emu-xref>).</ins>
               </td>
             </tr>
             <tr>
@@ -1139,6 +1139,36 @@ contributors: Luca Casonato, Guy Bedford
           </table>
         </emu-table>
 
+        <emu-clause id="sec-createnewmodulesourceidentity" type="abstract operation">
+          <h1>
+            <ins>
+              CreateNewModuleSourceIdentity (
+              ): a module source identity
+            </ins>
+          </h1>
+          <dl class="header">
+            <dt>description</dt>
+            <dd><ins>It creates a new <dfn id="module-source-identity" variants="module source identities">module source identity</dfn>, a globally unique specification value, compared only by identity, and created only by this operation.</ins></dd>
+          </dl>
+          <emu-alg>
+            1. Return a new module source identity.
+          </emu-alg>
+          <p><ins>Module source identities satisfy the following properties:</ins></p>
+          <ul>
+            <li><ins>Two module source identities are equal if and only if they were returned by the same invocation of CreateNewModuleSourceIdentity, regardless of the agent in which they were created.</ins></li>
+            <li><ins>Module source identities may be shared between agents, preserving their uniqueness, for example when transferring a Module Source Object between agents.</ins></li>
+          </ul>
+        </emu-clause>
+
+        <emu-clause id="sec-module-source-record-invariants">
+          <h1><ins>Module Source Record Invariants</ins></h1>
+          <p><ins>Hosts creating Module Source Records, whether through HostGetModuleSourceRecord or by passing _sourceIdentity_ to ParseModule, must ensure that for any two Module Source Records _left_ and _right_ with equal [[SourceIdentity]]:</ins></p>
+          <ul>
+            <li><ins>_left_.[[ModuleSourceKind]] is _right_.[[ModuleSourceKind]];</ins></li>
+            <li><ins>_left_.[[HostDefined]] and _right_.[[HostDefined]] are equivalent under a host-defined equivalence relation.</ins></li>
+          </ul>
+        </emu-clause>
+
         <emu-clause id="sec-modulesourcesequal" type="abstract operation">
           <h1>
             <ins>
@@ -1153,11 +1183,12 @@ contributors: Luca Casonato, Guy Bedford
             <dd><ins>It checks module source equality of two Module Source Records.</ins></dd>
           </dl>
           <emu-alg>
-            1. If _left_.[[SourceText]] is ~none~ or _right_.[[SourceText]] is ~none~, return *false*.
-            1. If _left_.[[HostDefined]] is not _right_.[[HostDefined]], return *false*.
-            1. If _left_.[[SourceText]] is not _right_.[[SourceText]], return *false*.
-            1. Return *true*.
+            1. If _left_.[[SourceIdentity]] is _right_.[[SourceIdentity]], return *true*.
+            1. Return *false*.
           </emu-alg>
+          <emu-note>
+            <p><ins>Module Source Records with equal [[SourceIdentity]] represent the same underlying module source: the same source text and host-defined metadata.</ins></p>
+          </emu-note>
         </emu-clause>
       </emu-clause>
 
@@ -1170,6 +1201,7 @@ contributors: Luca Casonato, Guy Bedford
               _sourceText_: ECMAScript source text,
               _realm_: a Realm Record,
               _hostDefined_: anything,
+              <ins>optional _sourceIdentity_: a module source identity,</ins>
             ): a Source Text Module Record or a non-empty List of *SyntaxError* objects
           </h1>
           <dl class="header">
@@ -1179,6 +1211,7 @@ contributors: Luca Casonato, Guy Bedford
           <emu-alg>
             1. Let _body_ be ParseText(_sourceText_, |Module|).
             1. If _body_ is a List of errors, return _body_.
+            1. <ins>If _sourceIdentity_ is not present, set _sourceIdentity_ to CreateNewModuleSourceIdentity().</ins>
             1. Let _requestedModules_ be the ModuleRequests of _body_.
             1. Let _importEntries_ be the ImportEntries of _body_.
             1. Let _importedBoundNames_ be ImportedLocalNames(_importEntries_).
@@ -1205,12 +1238,15 @@ contributors: Luca Casonato, Guy Bedford
                 1. Append _ee_ to _indirectExportEntries_.
             1. Let _async_ be _body_ Contains `await`.
             1. <ins>Let _moduleSourceObject_ be OrdinaryObjectCreate(%ModuleSource.prototype%, « [[ModuleSourceRecord]] »).</ins>
-            1. <ins>Let _moduleSourceRecord_ be the Module Source Record { [[HostDefined]]: _hostDefined_, [[SourceText]]: _sourceText_, [[ModuleSourceKind]]: *"ModuleSource"*, [[ModuleSource]]: _moduleSourceObject_ }.</ins>
+            1. <ins>Let _moduleSourceRecord_ be the Module Source Record { [[HostDefined]]: _hostDefined_, [[SourceIdentity]]: _sourceIdentity_, [[ModuleSourceKind]]: *"ModuleSource"*, [[ModuleSource]]: _moduleSourceObject_ }.</ins>
             1. <ins>Set _moduleSourceObject_.[[ModuleSourceRecord]] to _moduleSourceRecord_.</ins>
             1. Return Source Text Module Record { [[Realm]]: _realm_, [[Environment]]: ~empty~, [[Namespace]]: ~empty~, [[CycleRoot]]: ~empty~, [[HasTLA]]: _async_, [[AsyncEvaluation]]: *false*, [[TopLevelCapability]]: ~empty~, [[AsyncParentModules]]: « », [[PendingAsyncDependencies]]: ~empty~, [[Status]]: ~new~, [[EvaluationError]]: ~empty~, <del>[[HostDefined]]: _hostDefined_,</del> <ins>[[SourceRecord]]: _moduleSourceRecord_,</ins> [[ECMAScriptCode]]: _body_, [[Context]]: ~empty~, [[ImportMeta]]: ~empty~, <del>[[ModuleSource]]: _moduleSourceObject_,</del> [[RequestedModules]]: _requestedModules_, [[LoadedModules]]: « », [[ImportEntries]]: _importEntries_, [[LocalExportEntries]]: _localExportEntries_, [[IndirectExportEntries]]: _indirectExportEntries_, [[StarExportEntries]]: _starExportEntries_, [[DFSIndex]]: ~empty~, [[DFSAncestorIndex]]: ~empty~ }.
           </emu-alg>
           <emu-note>
             <p>An implementation may parse module source text and analyse it for Early Error conditions prior to the evaluation of ParseModule for that module source text. However, the reporting of any errors must be deferred until the point where this specification actually performs ParseModule upon that source text.</p>
+          </emu-note>
+          <emu-note>
+            <p><ins>Hosts pass _sourceIdentity_ when creating a Source Text Module Record for an existing module source, such as when deserializing a Module Source Object that was transferred from another agent, so that the resulting Module Source Record shares its identity with the original, subject to the <emu-xref href="#sec-module-source-record-invariants">Module Source Record Invariants</emu-xref>.</ins></p>
           </emu-note>
         </emu-clause>
 
@@ -1280,8 +1316,10 @@ contributors: Luca Casonato, Guy Bedford
           <li>
             <p><ins>For every pair (_referrer_, _moduleRequest_) that calls FinishLoadingImportedModule(_referrer_, _moduleRequest_, _payload_, NormalCompletion(_module_)), hosts must define a singular <dfn>Canonical ModuleRequest Record</dfn>, _moduleRequestKey_, satisfying:</ins></p>
             <ul>
+              <li><ins>_moduleRequestKey_.[[Specifier]] is a String;</ins></li>
               <li><ins>_moduleRequestKey_.[[Phase]] is equal to ~source~ (the lowest possible phase);</ins></li>
               <li><ins>FinishLoadingImportedModule will return the same NormalCompletion(_module_) _result_ for all (_otherReferrer_, _otherModuleRequest_) pairs whose Canonical ModuleRequest Record is also _moduleRequestKey_;</ins></li>
+              <li><ins>If _moduleRequest_.[[Specifier]] is a Module Source Record, then ModuleSourcesEqual(_moduleRequest_.[[Specifier]], _module_.[[SourceRecord]]) is *true*;</ins></li>
               <li><ins>For any other module request _otherModuleRequest_ with Canonical ModuleRequest Record _otherModuleRequestKey_, if ModuleRequestsEqual(_moduleRequest_, _otherModuleRequest_) is *true*, then ModuleRequestsEqual(_moduleRequestKey_, _otherModuleRequestKey_) must be *true*.</ins></li>
             </ul>
             <p>If this operation is called multiple times <ins>first with (_referrer1_, _moduleRequest1_, _hostDefined1_, _payload1_) and later with (_referrer2_, _moduleRequest2_, _hostDefined2_, _payload2_)</ins><del>with two (_referrer_, _moduleRequest_) pairs</del> such that:</p>
@@ -1355,7 +1393,7 @@ contributors: Luca Casonato, Guy Bedford
           </dl>
           <emu-alg>
             1. Let _realm_ be the current Realm Record.
-            1. <ins>Let _moduleSourceRecord_ be the Module Source Record { [[HostDefined]]: *undefined*, [[SourceText]]: ~none~, [[ModuleSourceKind]]: *"SyntheticModule"*, [[ModuleSource]]: ~empty~ }.</ins>
+            1. <ins>Let _moduleSourceRecord_ be the Module Source Record { [[HostDefined]]: *undefined*, [[SourceIdentity]]: CreateNewModuleSourceIdentity(), [[ModuleSourceKind]]: *"SyntheticModule"*, [[ModuleSource]]: ~empty~ }.</ins>
             1. Let _setDefaultExport_ be a new Abstract Closure with parameters (_module_) that captures _defaultExport_ and performs the following steps when called:
               1. Perform SetSyntheticModuleExport(_module_, *"default"*, _defaultExport_).
               1. Return NormalCompletion(~unused~).
@@ -1416,6 +1454,9 @@ contributors: Luca Casonato, Guy Bedford
         <ul>
           <li>
             <ins>Defines any host-specific module sources, by returning their Module Source Record.</ins>
+          </li>
+          <li>
+            <ins>If called multiple times with the same _specifier_, the [[SourceIdentity]] of every returned Module Source Record must be equal.</ins>
           </li>
           <li>
             <ins>For all other objects, returns ~not-a-source~.</ins>
