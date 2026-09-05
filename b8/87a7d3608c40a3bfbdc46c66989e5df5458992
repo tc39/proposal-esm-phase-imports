@@ -1,0 +1,22 @@
+build/index.html
+  s_000227aa0a4d32::t_67d28ce394ef10 5160-5161,5172,5174,5185,5194-5195,5234,5258,5261
+  s_000227aa0a4d32::t_717d081a6d248d 1627,5091,5093-5094,5096-5102,5108,5111,5115,5124-5125,5133-5134,5140,5144,5149,5154,5159,5162,5165
+spec.emu
+  s_000227aa0a4d32::t_05274bf187cc23 1317,1319-1320,1322-1328,1456-1458
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "b887a7d3608c40a3bfbdc46c66989e5df5458992",
+  "prompts": {},
+  "sessions": {
+    "s_000227aa0a4d32": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f91a47dd4ffepnXfKGLhpQJVLx",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Guy Bedford <gbedford@cloudflare.com>"
+    }
+  }
+}
