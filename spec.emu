@@ -1174,7 +1174,7 @@ contributors: Luca Casonato, Guy Bedford
 
         <emu-clause id="sec-module-source-record-invariants">
           <h1><ins>Module Source Record Invariants</ins></h1>
-          <p><ins>Hosts transferring module source identities, whether through HostGetModuleSourceRecord or by passing _sourceIdentity_ to ParseModule, must ensure that for any two Module Source Records _left_ and _right_ with equal [[SourceIdentity]]:</ins></p>
+          <p><ins>Hosts <emu-xref href="#module-source-identity-transfer">transferring</emu-xref> module source identities, whether through HostGetModuleSourceRecord or by passing _sourceIdentity_ to ParseModule, must ensure that for any two Module Source Records _left_ and _right_ with equal [[SourceIdentity]]:</ins></p>
           <ul>
             <li><ins>_left_.[[ModuleSourceKind]] is _right_.[[ModuleSourceKind]];</ins></li>
             <li><ins>_left_.[[SourceText]] is _right_.[[SourceText]];</ins></li>
@@ -1346,7 +1346,7 @@ contributors: Luca Casonato, Guy Bedford
             <p><ins>then FinishLoadingImportedModule must be called with _module2_ equal to _module1_.</ins></p>
           </li>
           <li>
-            <p><ins>A module source identity _sourceIdentity_ is <dfn id="retained-module-source-identity">retained</dfn> in an agent at a given time if there exists a <emu-xref href="#sec-liveness">live</emu-xref> Module Source Object _obj_ in that agent such that GetModuleSourceRecord(_obj_).[[SourceIdentity]] is _sourceIdentity_.</ins></p>
+            <p><ins>A module source identity _sourceIdentity_ is <em>retained</em> in an agent at a given time if there exists a <emu-xref href="#sec-liveness">live</emu-xref> Module Source Object _obj_ in that agent such that GetModuleSourceRecord(_obj_).[[SourceIdentity]] is _sourceIdentity_.</ins></p>
             <p><ins>The requirements above that the same Module Record be returned for module requests with equal Canonical ModuleRequest Records do not apply between two calls to this operation if the later call's _moduleRequest_.[[Specifier]] is a Module Source Record whose [[SourceIdentity]] was, at some time between the two calls, not retained in the agent.</ins></p>
             <emu-note>
               <p><ins>This permits hosts to associate a Module Source Record with its Module Record only for as long as a Module Source Object with that module source identity is live in the agent, for example by keying the association weakly on the Module Source Object. A Module Record whose module source identity is only referenced from other agents may then be collected, and if the identity is later transferred back into the agent, importing it may resolve to a new Module Record.</ins></p>
