@@ -142,20 +142,28 @@ the parent environment that the module source was created from to provide consis
 
 ### CSP Integration
 
-For WebAssembly, CSP integration is a compile-time check, which occurs before construction of
-the `AbstractModuleSource` corresponding to the WebAssembly module. That is, by the time one has
-an `AbstractModuleSource` one has already passed the CSP policy checks.
+CSP is enforced at import, not at the creation or transfer of a module source. Holding an
+`AbstractModuleSource` does not imply permission to execute it: a module source can be passed
+between same-origin realms, or structured cloned to another agent, where a different policy
+applies.
 
-For JavaScript, CSP integration similarly occurs statically before execution, where having `source`
-phase import handle to a JS `ModuleSource` implies the CSP permission to execute that source.
+For string specifiers, this is the existing `script-src` check made when the module is fetched into
+a realm's module map.
 
-For dynamic import, passing an `AbstractModuleSource` to dynamic import would not need to go through
-CSP checks, since the obtained object would have already been vetted by CSP.
+For a module source passed to dynamic `import()`, the host makes the same check in
+`HostLoadImportedModule` against the policy of the importing realm, using the URL the source was
+originally loaded from as retained in its `[[HostDefined]]` data. The check is only skipped for a
+source that was loaded through the module map of that same realm, having already been checked
+there. As with string specifiers, the check does not depend on the phase of the import.
 
-For `new Worker(module)`, there may be a stricter `worker-src` policy than the `script-src` policy,
-requiring CSP policy verification against the `src` for the module. In this case, it should be
-possible to recreate the original CSP `src` from the `[[HostDefined]]` data, without needing any
-explicit ECMA-262 integration.
+Only URL-based policy can be checked again in this way. A source that was originally permitted by
+a nonce or by `'strict-dynamic'` does not pass the check in another realm.
+
+For `new Worker(module)`, the worker behaves as if the module was cloned into the worker and then
+imported, so the same import check applies, along with the `worker-src` policy of the creating
+realm against the URL of the source.
+
+No ECMA-262 integration is needed beyond `HostLoadImportedModule` being able to reject the import.
 
 ### Structured Clone
 
