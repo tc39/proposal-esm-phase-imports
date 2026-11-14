@@ -1346,13 +1346,6 @@ contributors: Luca Casonato, Guy Bedford
             <p><ins>then FinishLoadingImportedModule must be called with _module2_ equal to _module1_.</ins></p>
           </li>
           <li>
-            <p><ins>A module source identity _sourceIdentity_ is <em>retained</em> in an agent at a given time if there exists a <emu-xref href="#sec-liveness">live</emu-xref> Module Source Object _obj_ in that agent such that GetModuleSourceRecord(_obj_).[[SourceIdentity]] is _sourceIdentity_.</ins></p>
-            <p><ins>The requirements above that the same Module Record be returned for module requests with equal Canonical ModuleRequest Records do not apply between two calls to this operation if the later call's _moduleRequest_.[[Specifier]] is a Module Source Record whose [[SourceIdentity]] was, at some time between the two calls, not retained in the agent.</ins></p>
-            <emu-note>
-              <p><ins>This permits hosts to associate a Module Source Record with its Module Record only for as long as a Module Source Object with that module source identity is live in the agent, for example by keying the association weakly on the Module Source Object. A Module Record whose module source identity is only referenced from other agents may then be collected, and if the identity is later transferred back into the agent, importing it may resolve to a new Module Record.</ins></p>
-            </emu-note>
-          </li>
-          <li>
             The completion record returned by this operation must not be affected by _moduleRequest_.[[Phase]].
           </li>
           <li>
